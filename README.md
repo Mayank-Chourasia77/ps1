@@ -7,7 +7,19 @@
 
 > A real-time, AI-powered traffic optimization dashboard for Mumbai's road network using Game Theory (Nash Equilibrium), Machine Learning, and Explainable AI.
 
-![Dashboard Preview](docs/dashboard_preview.png)
+---
+
+## 📸 Dashboard Preview
+
+### Current State (Nash Equilibrium)
+*Shows inefficient routing with PoA > 1.0*
+
+![Current State - Inefficient Routing](docs/dashboard_current.png)
+
+### Optimized State (System Optimum)
+*Shows AI-optimized routing with PoA = 1.0*
+
+![Optimized State - AI Routing](docs/dashboard_optimized.png)
 
 ---
 
