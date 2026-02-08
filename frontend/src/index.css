@@ -196,3 +196,39 @@ input:checked+.slider:before {
 .route-glow path {
   filter: drop-shadow(0 0 6px currentColor);
 }
+
+/* ===== METRIC CARD FLASH ANIMATION ===== */
+@keyframes metricFlash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(13, 166, 242, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 20px 4px rgba(13, 166, 242, 0.4);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(13, 166, 242, 0);
+  }
+}
+
+.metric-flash {
+  animation: metricFlash 0.3s ease-out;
+}
+
+/* Peak hour indicator pulse */
+@keyframes peakPulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.peak-indicator {
+  animation: peakPulse 1s ease-in-out infinite;
+}

@@ -52,8 +52,10 @@ const App = () => {
   const [congestionMode, setCongestionMode] = useState(false);
 
   // --- SIMULATION STATE ---
-  const [simulationTime, setSimulationTime] = useState(8); // 8:00 AM
+  const [simulationTime, setSimulationTime] = useState(6); // 06:00 AM
   const [isPlaying, setIsPlaying] = useState(false);
+  const [simulationSpeed, setSimulationSpeed] = useState(1); // 1x, 5x, 10x
+  const [metricFlash, setMetricFlash] = useState(false); // For flash animation
   const [selectedSource, setSelectedSource] = useState('');
   const [selectedTarget, setSelectedTarget] = useState('');
   const [userQuery, setUserQuery] = useState('');
@@ -152,43 +154,94 @@ const App = () => {
     fetchNodes();
   }, []);
 
-  // --- SIMULATION TIME LOOP ---
+  // --- SYNCHRONIZED SIMULATION LOOP (BPR Formula) ---
   useEffect(() => {
     if (!isPlaying) return;
+
+    // Interval based on speed: 1x=1000ms, 5x=200ms, 10x=100ms
+    const intervalMs = 1000 / simulationSpeed;
 
     const interval = setInterval(() => {
       setSimulationTime(prev => {
         const next = prev + 0.25; // 15 min increments
-        if (next >= 24) return 8; // Reset to 8 AM
+        if (next >= 24) return 6; // Reset to 6 AM
         return next;
       });
 
-      // Update congestion based on time of day
+      // Trigger flash animation
+      setMetricFlash(true);
+      setTimeout(() => setMetricFlash(false), 300);
+
+      // Update congestion using BPR-style formula
       setData(prevData => {
         if (!prevData || !prevData.links) return prevData;
 
         const hour = simulationTime;
-        let multiplier = 1.0;
+        const isPeakHour = (hour >= 8 && hour <= 11) || (hour >= 17 && hour <= 20);
 
-        // Peak hours: 8-10 AM and 5-8 PM
-        if ((hour >= 8 && hour <= 10) || (hour >= 17 && hour <= 20)) {
-          multiplier = 1.05; // 5% increase per step
-        } else if (hour >= 11 && hour <= 16) {
-          multiplier = 0.95; // 5% decrease
+        // BPR-inspired congestion factor
+        const baseFactor = isPeakHour ? 1.0 + 0.8 : 1.0;
+        const randomVariation = (Math.random() - 0.5) * 0.2; // -0.1 to +0.1
+        let congestionFactor = baseFactor + randomVariation;
+
+        // Apply optimization damping if enabled (reduces congestion by 15%)
+        if (optimized) {
+          congestionFactor *= 0.85;
         }
 
         return {
           ...prevData,
-          links: prevData.links.map(link => ({
-            ...link,
-            congestion: Math.max(10, Math.min(95, link.congestion * multiplier))
-          }))
+          links: prevData.links.map(link => {
+            // Calculate new congestion using factor
+            let newCongestion = link.congestion;
+
+            if (isPeakHour && !optimized) {
+              // Peak hours: increase towards max
+              newCongestion = Math.min(95, link.congestion * (1 + 0.05 * congestionFactor));
+            } else if (isPeakHour && optimized) {
+              // Peak + Optimized: stay moderate
+              newCongestion = Math.max(20, Math.min(60, link.congestion * congestionFactor));
+            } else {
+              // Off-peak: decrease
+              newCongestion = Math.max(10, link.congestion * 0.95);
+            }
+
+            return {
+              ...link,
+              congestion: newCongestion
+            };
+          })
         };
       });
-    }, 2000); // Every 2 seconds = 15 mins simulation time
+
+      // Update metrics based on current data
+      setMetrics(prev => {
+        if (!prev) return prev;
+        const hour = simulationTime;
+        const isPeakHour = (hour >= 8 && hour <= 11) || (hour >= 17 && hour <= 20);
+
+        // Calculate PoA: higher during peak, lower when optimized
+        let newPoA = isPeakHour ? 1.45 + Math.random() * 0.2 : 1.15 + Math.random() * 0.1;
+        if (optimized) newPoA = 1.05 + Math.random() * 0.05;
+
+        // BPR Cost formula: cost increases with congestion^4
+        const congestionLevel = isPeakHour ? (optimized ? 0.5 : 0.8) : 0.3;
+        const baseCost = 50000;
+        const newNashCost = baseCost * (1 + 0.15 * Math.pow(congestionLevel * 100 / 20, 4));
+        const newOptCost = newNashCost / newPoA;
+
+        return {
+          ...prev,
+          price_of_anarchy: newPoA,
+          nash_cost: newNashCost,
+          optimized_cost: newOptCost,
+          total_throughput: isPeakHour ? 85000 + Math.random() * 10000 : 45000 + Math.random() * 10000
+        };
+      });
+    }, intervalMs);
 
     return () => clearInterval(interval);
-  }, [isPlaying, simulationTime]);
+  }, [isPlaying, simulationTime, simulationSpeed, optimized]);
 
 
   const fetchNodes = async () => {
@@ -398,7 +451,7 @@ const App = () => {
   };
 
   const MetricCard = ({ icon, title, value, subtext, trend, trendValue, trendOptimized, tooltip, progressBar }) => (
-    <div className="group relative p-4 rounded-xl bg-[#182b34] border border-[#223c49] transition-all duration-300 hover:scale-[1.05] hover:shadow-[0_0_20px_rgba(13,166,242,0.15)] hover:border-primary/50 z-10">
+    <div className={`group relative p-4 rounded-xl bg-[#182b34] border border-[#223c49] transition-all duration-300 hover:scale-[1.05] hover:shadow-[0_0_20px_rgba(13,166,242,0.15)] hover:border-primary/50 z-10 ${metricFlash ? 'metric-flash' : ''}`}>
       {/* Tooltip */}
       <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-[#0b1216] text-slate-300 text-[10px] px-3 py-1.5 rounded border border-[#223c49] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-xl z-50">
         {tooltip}
@@ -652,27 +705,59 @@ const App = () => {
               </button>
             </div>
 
-            {/* Timeline Player - Packet Tracer Simulation */}
-            <div className="pointer-events-auto glass-panel p-2 rounded-xl shadow-2xl flex items-center gap-3 border border-accent-warning/40 bg-[#101d23]/90 mt-2">
+            {/* Timeline Player - Synchronized Simulation */}
+            <div className="pointer-events-auto glass-panel p-3 rounded-xl shadow-2xl flex items-center gap-4 border border-accent-warning/40 bg-[#101d23]/90 mt-2">
+              {/* Play/Pause */}
               <button
                 onClick={() => setIsPlaying(!isPlaying)}
-                className={`p-2 rounded-lg transition-all ${isPlaying ? 'bg-accent-danger/20 text-accent-danger' : 'bg-accent-success/20 text-accent-success'}`}
+                className={`p-2.5 rounded-lg transition-all ${isPlaying ? 'bg-accent-danger/20 text-accent-danger' : 'bg-accent-success/20 text-accent-success'}`}
                 title={isPlaying ? "Pause Simulation" : "Start Simulation"}
               >
-                <span className="material-symbols-outlined text-lg">{isPlaying ? 'pause' : 'play_arrow'}</span>
+                <span className="material-symbols-outlined text-xl">{isPlaying ? 'pause' : 'play_arrow'}</span>
               </button>
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] text-slate-500 font-mono tracking-widest">SIMULATION TIME</span>
-                <span className="text-lg font-bold text-accent-warning font-mono">
+
+              {/* Time Display */}
+              <div className="flex flex-col items-center min-w-[100px]">
+                <span className="text-[9px] text-slate-500 font-mono tracking-widest">SIMULATION</span>
+                <span className="text-xl font-bold text-accent-warning font-mono">
                   {String(Math.floor(simulationTime)).padStart(2, '0')}:{String(Math.round((simulationTime % 1) * 60)).padStart(2, '0')}
                 </span>
-              </div>
-              <div className="flex flex-col items-center px-2">
-                <span className="text-[9px] text-slate-600 font-mono">
-                  {simulationTime >= 8 && simulationTime <= 10 ? '🔴 PEAK' :
-                    simulationTime >= 17 && simulationTime <= 20 ? '🔴 PEAK' :
-                      '🟢 NORMAL'}
+                <span className={`text-[9px] font-mono ${(simulationTime >= 8 && simulationTime <= 11) || (simulationTime >= 17 && simulationTime <= 20) ? 'text-accent-danger peak-indicator' : 'text-accent-success'}`}>
+                  {(simulationTime >= 8 && simulationTime <= 11) || (simulationTime >= 17 && simulationTime <= 20) ? '⚠ PEAK TRAFFIC' : '✓ NORMAL FLOW'}
                 </span>
+              </div>
+
+              {/* Time Scrubber */}
+              <div className="flex flex-col gap-1 flex-1 min-w-[120px]">
+                <input
+                  type="range"
+                  min="0"
+                  max="24"
+                  step="0.25"
+                  value={simulationTime}
+                  onChange={(e) => setSimulationTime(parseFloat(e.target.value))}
+                  className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-accent-warning"
+                />
+                <div className="flex justify-between text-[8px] text-slate-600 font-mono">
+                  <span>00:00</span>
+                  <span className="text-accent-danger">PEAK</span>
+                  <span>12:00</span>
+                  <span className="text-accent-danger">PEAK</span>
+                  <span>24:00</span>
+                </div>
+              </div>
+
+              {/* Speed Controls */}
+              <div className="flex gap-1">
+                {[1, 5, 10].map(speed => (
+                  <button
+                    key={speed}
+                    onClick={() => setSimulationSpeed(speed)}
+                    className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${simulationSpeed === speed ? 'bg-primary text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                  >
+                    {speed}x
+                  </button>
+                ))}
               </div>
             </div>
 
