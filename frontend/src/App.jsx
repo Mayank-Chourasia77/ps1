@@ -825,7 +825,7 @@ const App = () => {
             <MetricCard
               icon="traffic"
               title="Vehicle Throughput"
-              value={metrics && metrics.total_throughput ? new Intl.NumberFormat('en-IN').format(Math.round(metrics.total_throughput)) : (edges && edges.length > 0 ? new Intl.NumberFormat('en-IN').format(edges.length * 1500) : "37,500")}
+              value={metrics && metrics.total_throughput ? new Intl.NumberFormat('en-IN').format(Math.round(metrics.total_throughput)) : "72,000"}
               subtext="/hr"
               trend="drag_handle"
               trendValue="Real-time"
