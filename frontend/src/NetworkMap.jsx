@@ -32,8 +32,14 @@ const NetworkMap = ({ data, simulationTime, optimized, onNodeSelect, selectedSou
         if (!data || !data.links) return null;
 
         return data.links.map((link, idx) => {
+            if (!link || !link.source || !link.target) return null;
+
             const sourceId = link.source.id || link.source;
             const targetId = link.target.id || link.target;
+
+            // Safety check for IDs
+            if (!sourceId || !targetId) return null;
+
             const start = NODES[sourceId];
             const end = NODES[targetId];
 
@@ -41,7 +47,8 @@ const NetworkMap = ({ data, simulationTime, optimized, onNodeSelect, selectedSou
 
             // Simulation Logic
             const isPeak = (simulationTime >= 8 && simulationTime <= 10) || (simulationTime >= 17 && simulationTime <= 20);
-            const isCongested = (link.congestion > 70) || (isPeak && !optimized);
+            const congestionVal = link.congestion || 0;
+            const isCongested = (congestionVal > 70) || (isPeak && !optimized);
 
             // Determine Animation Class
             let animClass = "traffic-anim traffic-static"; // Default faint
@@ -54,13 +61,11 @@ const NetworkMap = ({ data, simulationTime, optimized, onNodeSelect, selectedSou
             } else if (optimized) {
                 animClass = "traffic-anim fast";
                 strokeColor = "#22c55e";
-            } else if (link.congestion < 40) {
+            } else if (congestionVal < 40) {
                 animClass = "traffic-anim fast";
                 strokeColor = "#22c55e";
             } else {
-                animClass = "traffic-anim"; // Medium opacity handled by base class? No, let's explicit
-                // actually we can use the 'traffic-anim' base with no modifier for medium? 
-                // Let's use inline styles to be sure or add 'medium' class if defined
+                animClass = "traffic-anim";
                 strokeColor = "#f59e0b"; // Orange
             }
 

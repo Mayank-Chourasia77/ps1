@@ -572,7 +572,7 @@ const App = () => {
                   className="bg-transparent border-none text-white text-xs font-mono focus:ring-0 w-32 md:w-44 focus:outline-none appearance-none cursor-pointer"
                 >
                   <option value="" className="bg-background-dark">FROM: SELECT NODE</option>
-                  {(allNodes.length > 0 ? allNodes : [...new Set(data.links.map(l => l.source.id || l.source))]).sort().map(node => (
+                  {(allNodes.length > 0 ? allNodes : [...new Set((data.links || []).map(l => l.source.id || l.source))]).sort().map(node => (
                     <option key={node} value={node} className="bg-background-dark">{node}</option>
                   ))}
                 </select>
@@ -586,7 +586,7 @@ const App = () => {
                   className="bg-transparent border-none text-white text-xs font-mono focus:ring-0 w-32 md:w-44 focus:outline-none appearance-none cursor-pointer"
                 >
                   <option value="" className="bg-background-dark">TO: SELECT NODE</option>
-                  {(allNodes.length > 0 ? allNodes : [...new Set(data.links.map(l => l.target.id || l.target))]).sort().map(node => (
+                  {(allNodes.length > 0 ? allNodes : [...new Set((data.links || []).map(l => l.target.id || l.target))]).sort().map(node => (
                     <option key={node} value={node} className="bg-background-dark">{node}</option>
                   ))}
                 </select>
