@@ -14,14 +14,18 @@
 ### Current State (Nash Equilibrium)
 *Shows inefficient routing with PoA > 1.0*
 
-![Current State - Inefficient Routing](docs/dashboard_current.png)
+<img width="1919" height="907" alt="Screenshot 2026-02-08 120725" src="https://github.com/user-attachments/assets/da4b862d-b1d9-40e0-a42c-6754c2113906" />
+
+
 
 ### Optimized State (System Optimum)
 *Shows AI-optimized routing with PoA = 1.0*
 
-![Optimized State - AI Routing](docs/dashboard_optimized.png)
+<img width="1919" height="915" alt="Screenshot 2026-02-08 120735" src="https://github.com/user-attachments/assets/47be8f2d-a7c8-490d-8757-2449606293f6" />
+
 
 ---
+
 
 ## 🚀 Features
 
