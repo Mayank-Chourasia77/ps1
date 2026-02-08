@@ -1,42 +1,50 @@
 <!doctype html>
 <html class="dark" lang="en">
-  <head>
+
+<head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Traffix AI Mission Control Dashboard</title>
-    
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com" rel="preconnect"/>
-    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-    
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script id="tailwind-config">
         tailwind.config = {
             darkMode: "class",
             theme: {
-            extend: {
-                colors: {
-                "primary": "#0da6f2",
-                "background-light": "#f5f7f8",
-                "background-dark": "#101c22",
-                "panel-dark": "#182b34",
-                "accent-danger": "#ef4444",
-                "accent-warning": "#f59e0b",
-                "accent-success": "#10b981",
+                extend: {
+                    colors: {
+                        "primary": "#0da6f2",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#101c22",
+                        "panel-dark": "#182b34",
+                        "accent-danger": "#ef4444",
+                        "accent-warning": "#f59e0b",
+                        "accent-success": "#10b981",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "mono": ["Space Grotesk", "monospace"], // Using Space Grotesk for numbers/mono feel
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                    backgroundImage: {
+                        'grid-pattern': "linear-gradient(to right, #1f2937 1px, transparent 1px), linear-gradient(to bottom, #1f2937 1px, transparent 1px)",
+                    }
                 },
-                fontFamily: {
-                "display": ["Space Grotesk", "sans-serif"],
-                "mono": ["Space Grotesk", "monospace"], // Using Space Grotesk for numbers/mono feel
-                },
-                borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
-                backgroundImage: {
-                    'grid-pattern': "linear-gradient(to right, #1f2937 1px, transparent 1px), linear-gradient(to bottom, #1f2937 1px, transparent 1px)",
-                }
-            },
             },
         }
     </script>
@@ -46,15 +54,18 @@
             width: 8px;
             height: 8px;
         }
+
         ::-webkit-scrollbar-track {
-            background: #101c22; 
+            background: #101c22;
         }
+
         ::-webkit-scrollbar-thumb {
-            background: #223c49; 
+            background: #223c49;
             border-radius: 4px;
         }
+
         ::-webkit-scrollbar-thumb:hover {
-            background: #315668; 
+            background: #315668;
         }
 
         .glass-panel {
@@ -63,7 +74,7 @@
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
-        
+
         .grid-bg {
             background-size: 40px 40px;
             mask-image: linear-gradient(to bottom, transparent, 10%, black, 90%, transparent);
@@ -73,10 +84,11 @@
         .glow-text-primary {
             text-shadow: 0 0 10px rgba(13, 166, 242, 0.5);
         }
+
         .glow-border-primary {
             box-shadow: 0 0 15px rgba(13, 166, 242, 0.2);
         }
-        
+
         .scanline {
             width: 100%;
             height: 2px;
@@ -91,13 +103,21 @@
         }
 
         @keyframes scanline {
-            0% { top: 0%; }
-            100% { top: 100%; }
+            0% {
+                top: 0%;
+            }
+
+            100% {
+                top: 100%;
+            }
         }
     </style>
-  </head>
-  <body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display overflow-hidden h-screen flex flex-col">
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display overflow-hidden h-screen flex flex-col">
     <div id="root" class="h-full flex flex-col"></div>
     <script type="module" src="/src/main.jsx"></script>
-  </body>
+</body>
+
 </html>
