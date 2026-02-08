@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import NetworkMap from './NetworkMap';
+import NetworkGraph from './NetworkGraph';
 
 const formatNumber = (val) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
@@ -170,25 +170,58 @@ const App = () => {
     fetchNodes();
   }, []);
 
+  // --- STRICT SIMULATION LOOP (User Request) ---
+  useEffect(() => {
+    let interval;
+    if (isPlaying) {
+      interval = setInterval(() => {
+        setSimulationTime(prev => {
+          const next = prev + 0.05 * simulationSpeed; // Smoother tick
+          return next >= 24 ? 0 : next;
+        });
+      }, 50); // Fast tick for smooth animation
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, simulationSpeed]);
+
+  // --- METRICS UPDATE (Strict Binding) ---
+  useEffect(() => {
+    const hour = simulationTime;
+    const isPeak = (hour >= 8 && hour <= 11) || (hour >= 17 && hour <= 20);
+
+    // STRICT LOGIC:
+    // congestion = isPeak ? (isOptimized ? 15 : 85) : 10
+    const congestionVal = isPeak ? (optimized ? 15 : 85) : 10;
+
+    // cost = congestion * 450
+    const costVal = congestionVal * 450;
+
+    // Throughput inverse to congestion roughly? Or just static logic?
+    // User didn't specify throughput, but I should keep it dynamic.
+    // Let's say throughput = 100000 - (congestion * 800)
+    const throughputVal = 100000 - (congestionVal * 800);
+
+    setTrafficMetrics({
+      congestion: congestionVal.toFixed(1),
+      cost: costVal.toLocaleString('en-IN'),
+      latency: isPeak && !optimized ? "HIGH" : "NORMAL",
+      throughput: throughputVal.toLocaleString('en-IN')
+    });
+
+  }, [simulationTime, optimized]);
+
   // --- SYNCHRONIZED SIMULATION LOOP (BPR Formula) ---
+  // This useEffect is modified to only update the data (links congestion)
+  // The simulationTime and trafficMetrics updates are now handled by the new strict loops.
   useEffect(() => {
     if (!isPlaying) return;
 
     // Interval based on speed: 1x=1000ms, 5x=200ms, 10x=100ms
-    const intervalMs = 1000 / simulationSpeed;
+    const intervalMs = 1000 / simulationSpeed; // This interval now controls data updates, not time.
 
     const interval = setInterval(() => {
-      setSimulationTime(prev => {
-        const next = prev + 0.25; // 15 min increments
-        if (next >= 24) return 6; // Reset to 6 AM
-        return next;
-      });
-
-      // Trigger flash animation
-      setMetricFlash(true);
-      setTimeout(() => setMetricFlash(false), 300);
-
-      // Update congestion using BPR-style formula
+      // Data updates only (congestion evolution)
+      // Note: Simulation time and metrics are handled by strict loop above
       setData(prevData => {
         if (!prevData || !prevData.links) return prevData;
 
@@ -197,10 +230,9 @@ const App = () => {
 
         // BPR-inspired congestion factor
         const baseFactor = isPeakHour ? 1.0 + 0.8 : 1.0;
-        const randomVariation = (Math.random() - 0.5) * 0.2; // -0.1 to +0.1
+        const randomVariation = (Math.random() - 0.5) * 0.2;
         let congestionFactor = baseFactor + randomVariation;
 
-        // Apply optimization damping if enabled (reduces congestion by 15%)
         if (optimized) {
           congestionFactor *= 0.85;
         }
@@ -208,20 +240,14 @@ const App = () => {
         return {
           ...prevData,
           links: prevData.links.map(link => {
-            // Calculate new congestion using factor
             let newCongestion = link.congestion;
-
             if (isPeakHour && !optimized) {
-              // Peak hours: increase towards max
               newCongestion = Math.min(95, link.congestion * (1 + 0.05 * congestionFactor));
             } else if (isPeakHour && optimized) {
-              // Peak + Optimized: stay moderate
               newCongestion = Math.max(20, Math.min(60, link.congestion * congestionFactor));
             } else {
-              // Off-peak: decrease
               newCongestion = Math.max(10, link.congestion * 0.95);
             }
-
             return {
               ...link,
               congestion: newCongestion
@@ -230,47 +256,10 @@ const App = () => {
         };
       });
 
-      // Update metrics based on current data
-      setMetrics(prev => {
-        if (!prev) return prev;
-        const hour = simulationTime;
-        const isPeakHour = (hour >= 8 && hour <= 11) || (hour >= 17 && hour <= 20);
+      // Update metrics based on current data for backend logging if needed,
+      // but UI metrics are strictly bound in other loop.
+      // Removed setMetrics and setTrafficMetrics from here to strict binding.
 
-        // Calculate PoA: higher during peak, lower when optimized
-        let newPoA = isPeakHour ? 1.45 + Math.random() * 0.2 : 1.15 + Math.random() * 0.1;
-        if (optimized) newPoA = 1.05 + Math.random() * 0.05;
-
-        // BPR Cost formula: cost increases with congestion^4
-        const congestionLevel = isPeakHour ? (optimized ? 0.5 : 0.8) : 0.3;
-        const baseCost = 50000;
-        const newNashCost = baseCost * (1 + 0.15 * Math.pow(congestionLevel * 100 / 20, 4));
-        const newOptCost = newNashCost / newPoA;
-
-        return {
-          ...prev,
-          price_of_anarchy: newPoA,
-          nash_cost: newNashCost,
-          optimized_cost: newOptCost,
-          total_throughput: isPeakHour ? 85000 + Math.random() * 10000 : 45000 + Math.random() * 10000
-        };
-      });
-
-      // DYNAMIC CARD UPDATES - Live traffic metrics
-      const hour = simulationTime;
-      const isPeakHour = (hour >= 8 && hour <= 11) || (hour >= 17 && hour <= 20);
-      const timeMultiplier = isPeakHour ? 1.5 : 1.0;
-      const optimizationFactor = optimized ? 0.8 : 1.0;
-
-      const currentCongestion = 15 * timeMultiplier * optimizationFactor;
-      const currentCost = Math.floor(42000 * timeMultiplier * optimizationFactor);
-      const isCongested = isPeakHour && !optimized;
-
-      setTrafficMetrics({
-        congestion: currentCongestion.toFixed(1),
-        cost: currentCost.toLocaleString('en-IN'),
-        latency: isCongested ? "HIGH (+45%)" : "NORMAL",
-        throughput: Math.floor(72000 / (timeMultiplier * optimizationFactor)).toLocaleString('en-IN')
-      });
     }, intervalMs);
 
     return () => clearInterval(interval);
@@ -489,7 +478,7 @@ const App = () => {
   };
 
   const MetricCard = ({ icon, title, value, subtext, trend, trendValue, trendOptimized, tooltip, progressBar }) => (
-    <div className={`group relative p-4 rounded-xl bg-[#182b34] border border-[#223c49] transition-all duration-300 hover:scale-[1.05] hover:shadow-[0_0_20px_rgba(13,166,242,0.15)] hover:border-primary/50 z-10 ${metricFlash ? 'metric-flash' : ''}`}>
+    <div className={`group relative p-4 rounded-xl bg-[#182b34] border border-[#223c49] z-10`}>
       {/* Tooltip */}
       <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-[#0b1216] text-slate-300 text-[10px] px-3 py-1.5 rounded border border-[#223c49] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-xl z-50">
         {tooltip}
@@ -555,13 +544,12 @@ const App = () => {
 
 
           {/* Visualization Viewport - Cyberpunk Schematic */}
-          <NetworkMap
+          <NetworkGraph
             data={data}
-            simulationTime={simulationTime}
-            optimized={optimized}
-            onNodeSelect={handleNodeSelect}
             selectedSource={selectedSource}
             selectedTarget={selectedTarget}
+            optimized={optimized}
+            onNodeSelect={handleNodeSelect}
           />
 
           {/* Map Controls (Moved after map for proper stacking) */}
