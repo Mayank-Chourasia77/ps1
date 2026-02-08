@@ -1,9 +1,8 @@
-import { useEffect, useRef } from 'react';
 import { Polyline, Tooltip } from 'react-leaflet';
 
 /**
- * AnimatedPolyline - A Polyline that applies CSS animation classes directly to the SVG path
- * This is needed because react-leaflet's className prop doesn't apply to the path element
+ * AnimatedPolyline - Uses Leaflet's native className in pathOptions
+ * This is the correct way to apply CSS classes to SVG paths in Leaflet
  */
 const AnimatedPolyline = ({
     positions,
@@ -12,34 +11,16 @@ const AnimatedPolyline = ({
     eventHandlers,
     tooltipContent
 }) => {
-    const polylineRef = useRef(null);
-
-    useEffect(() => {
-        if (polylineRef.current && flowClass) {
-            // Get the actual Leaflet path element
-            const pathElement = polylineRef.current.getElement();
-            if (pathElement) {
-                // Remove old animation classes
-                pathElement.classList.remove(
-                    'traffic-flow-anim',
-                    'flow-fast',
-                    'flow-medium',
-                    'flow-slow',
-                    'flow-optimized'
-                );
-                // Add new classes
-                flowClass.split(' ').forEach(cls => {
-                    if (cls) pathElement.classList.add(cls);
-                });
-            }
-        }
-    }, [flowClass]);
+    // Merge flowClass into pathOptions.className
+    const mergedOptions = {
+        ...pathOptions,
+        className: flowClass || ''
+    };
 
     return (
         <Polyline
-            ref={polylineRef}
             positions={positions}
-            pathOptions={pathOptions}
+            pathOptions={mergedOptions}
             eventHandlers={eventHandlers}
         >
             {tooltipContent && (
