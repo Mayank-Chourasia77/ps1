@@ -170,26 +170,45 @@ input:checked+.slider:before {
   }
 }
 
-/* Base Animation - Applied to all animated routes */
-path.traffic-anim {
+/* Base Animation - Applied to all animated routes (paths and lines) */
+path.traffic-anim,
+line.traffic-anim {
   stroke-dasharray: 12, 12 !important;
   animation: flowAnim 1s linear infinite !important;
   stroke-linecap: round !important;
 }
 
 /* FAST (Green) - Free flow */
-path.traffic-anim.fast {
+path.traffic-anim.fast,
+line.traffic-anim.fast {
   stroke: #22c55e !important;
   animation-duration: 0.5s !important;
   filter: drop-shadow(0 0 4px #22c55e);
 }
 
 /* SLOW (Red) - Jammed traffic */
-path.traffic-anim.slow {
+path.traffic-anim.slow,
+line.traffic-anim.slow {
   stroke: #ef4444 !important;
   animation-duration: 4s !important;
   stroke-width: 6px !important;
   filter: drop-shadow(0 0 4px #ef4444);
+}
+
+/* STATIC (Background) - Faint lines */
+line.traffic-static {
+  stroke: #334155;
+  stroke-width: 2;
+  opacity: 0.3;
+}
+
+/* Schematic Grid Background */
+.schematic-grid {
+  background-image:
+    linear-gradient(rgba(30, 41, 59, 0.5) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(30, 41, 59, 0.5) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: center;
 }
 
 /* ===== METRIC CARD FLASH ANIMATION ===== */

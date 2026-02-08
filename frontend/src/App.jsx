@@ -76,6 +76,17 @@ const App = () => {
   const [calculatedPath, setCalculatedPath] = useState(null); // Stores full path from backend
   const [suggestedAction, setSuggestedAction] = useState("");
 
+  const handleNodeSelect = (nodeId) => {
+    if (!selectedSource) {
+      setSelectedSource(nodeId);
+    } else if (!selectedTarget && nodeId !== selectedSource) {
+      setSelectedTarget(nodeId);
+    } else {
+      setSelectedSource(nodeId);
+      setSelectedTarget('');
+    }
+  };
+
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
     window.addEventListener('resize', handleResize);
@@ -540,136 +551,15 @@ const App = () => {
         <section className="flex-1 flex flex-col relative z-10 p-4 gap-4 overflow-hidden min-h-[50vh] lg:min-h-0">
 
 
-          {/* Visualization Viewport */}
-          <div className="w-full h-full rounded-2xl overflow-hidden relative border border-[#223c49] bg-[#0b1216] shadow-inner group">
-            <MapContainer
-              center={[19.1136, 72.8697]}
-              zoom={11}
-              style={{ height: '100%', width: '100%', background: '#0b1216' }}
-              zoomControl={false}
-              ref={mapRef}
-            >
-              <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                attribution='&copy; CARTO'
-              />
-              {/* Render Full Graph Edges (Background) */}
-              {data.links.map((link, idx) => {
-                // Fallback to 0,0 if not found, or skip? skipping is safer visually.
-                // In a real app we'd need coords from backend. 
-                // For now, if missing, we just don't render the line which is better than crashing or drawing to null.
-                const startCoord = NODE_COORDS[link.source.id || link.source];
-                const endCoord = NODE_COORDS[link.target.id || link.target];
-                if (!startCoord || !endCoord) return null;
-
-                // Check if this link is part of the calculated path
-                let isPathSegment = false;
-                if (calculatedPath && calculatedPath.edges) {
-                  isPathSegment = calculatedPath.edges.some(e =>
-                    (e.from === (link.source.id || link.source) && e.to === (link.target.id || link.target)) ||
-                    (e.from === (link.target.id || link.target) && e.to === (link.source.id || link.source)) // Check reverse too if undirected visually
-                  );
-                }
-
-                const isSelected = selectedRoute &&
-                  (link.source.id || link.source) === selectedRoute.u &&
-                  (link.target.id || link.target) === selectedRoute.v;
-
-                let color = "#334155";
-                let weight = 2;
-                let opacity = 0.2;
-
-                if (isPathSegment) {
-                  if (optimized) {
-                    color = "#10b981"; // Optimized -> GREEN
-                  } else {
-                    // Current -> Color based on congestion
-                    const segmentCongestion = link.congestion; // simulated value available in data.links
-                    // If we want the specific path segment value from calculatedPath, we'd need to look it up, 
-                    // but link.congestion from global data is the source of truth for "current" state.
-
-                    if (segmentCongestion > 60) color = "#ef4444"; // RED
-                    else if (segmentCongestion > 30) color = "#f59e0b"; // ORANGE
-                    else color = "#10b981"; // GREEN
-                  }
-                  weight = 6;
-                  opacity = 1.0;
-                } else if (isSelected) {
-                  // Direct selection fallback
-                  if (link.congestion > 60) color = "#ef4444";
-                  else if (link.congestion > 30) color = "#f59e0b";
-                  else color = "#10b981";
-                  weight = 4;
-                  opacity = 0.8;
-                }
-
-                // Determine flow animation class - SIMPLIFIED
-                const isPeak = (simulationTime >= 8 && simulationTime <= 10) || (simulationTime >= 17 && simulationTime <= 20);
-                const isCongested = isPeak && !optimized;
-                const animClass = (isPathSegment || isSelected)
-                  ? (isCongested ? "traffic-anim slow" : "traffic-anim fast")
-                  : "";
-
-                return (
-                  <AnimatedPolyline
-                    key={`${idx}-${Math.floor(simulationTime)}-${optimized}`}
-                    positions={[startCoord, endCoord]}
-                    pathOptions={{
-                      className: animClass,
-                      color: isCongested ? "#ef4444" : (optimized ? "#22c55e" : color),
-                      weight: (isPathSegment || isSelected) ? 6 : weight,
-                      opacity: 1.0
-                    }}
-                    flowClass={animClass}
-                    eventHandlers={{
-                      click: () => {
-                        setSelectedSource(link.source.id || link.source);
-                        setSelectedTarget(link.target.id || link.target);
-                      }
-                    }}
-                    tooltipContent={
-                      <div className="bg-slate-900 border border-[#223c49] p-2 text-[10px] font-mono rounded text-white">
-                        <p className="font-bold uppercase mb-1">{link.source.id || link.source} → {link.target.id || link.target}</p>
-                        <p>CONGESTION: <span className={link.congestion > 60 ? 'text-accent-danger' : 'text-accent-success'}>
-                          {link.congestion.toFixed(1)}%
-                        </span></p>
-                        {isPeakHour && <p className="text-accent-warning text-[8px] mt-1">⚠ PEAK HOUR</p>}
-                      </div>
-                    }
-                  />
-                );
-              })}
-
-              {/* Render Calculated Path Overlay (if exists and edges missing in main graph) */}
-              {calculatedPath && calculatedPath.edges.map((edge, idx) => {
-                const startCoord = NODE_COORDS[edge.from];
-                const endCoord = NODE_COORDS[edge.to];
-                if (!startCoord || !endCoord) return null;
-
-                // Determine color for overlay segment
-                let color = "#10b981"; // Default optimized Green
-                if (!optimized) {
-                  // Check specific edge congestion
-                  if (edge.congestion > 60) color = "#ef4444";
-                  else if (edge.congestion > 30) color = "#f59e0b";
-                  else color = "#10b981";
-                }
-
-                return (
-                  <Polyline
-                    key={`path-${idx}`}
-                    positions={[startCoord, endCoord]}
-                    pathOptions={{
-                      color: color,
-                      weight: 6,
-                      opacity: 0.8,
-                      dashArray: optimized ? '10, 10' : null
-                    }}
-                  />
-                )
-              })}
-            </MapContainer>
-          </div>
+          {/* Visualization Viewport - Cyberpunk Schematic */}
+          <NetworkMap
+            data={data}
+            simulationTime={simulationTime}
+            optimized={optimized}
+            onNodeSelect={handleNodeSelect}
+            selectedSource={selectedSource}
+            selectedTarget={selectedTarget}
+          />
 
           {/* Map Controls (Moved after map for proper stacking) */}
           <div className="flex justify-between items-start absolute top-6 left-6 right-6 z-[500] pointer-events-none">
