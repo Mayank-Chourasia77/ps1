@@ -67,7 +67,58 @@ const App = () => {
   const [displayCost, setDisplayCost] = useState(null);
   const [displayThroughput, setDisplayThroughput] = useState(null);
 
-  // LOGIC FOR DYNAMIC METRICS
+  // --- DISASTER SIMULATION STATE ---
+  const [simulationMode, setSimulationMode] = useState(false);
+  const [simStep, setSimStep] = useState(0); // 0: Normal, 1: Accident, 2: Fixing
+  const simInterval = useRef(null);
+
+  const runDisasterSimulation = () => {
+    if (simulationMode) return; // Prevention
+    setSimulationMode(true);
+    setSimStep(0);
+    setOptimized(false);
+
+    // START TIMELINE
+    // 0s: Normalcy
+    addLog({ type: 'text', msg: "SIMULATION STARTED: SCENARIO #4 - SEA LINK BLOCKAGE", colorClass: "text-cyan-400" });
+    setPredictedCongestion(15);
+    setPredictedSpeed(65);
+    setSuggestedAction("System operating at normal capacity.");
+
+    // 5s: THE ACCIDENT
+    setTimeout(() => {
+      setSimStep(1);
+      setPredictedCongestion(88); // RED
+      setPredictedSpeed(12);
+      setSuggestedAction("CRITICAL: ACCIDENT DETECTED. TRAFFIC HALTED.");
+      addLog({ type: 'text', msg: "⚠️ ALERT: ACCIDENT DETECTED ON SEA LINK.", colorClass: "text-accent-danger font-bold" });
+      addLog({ type: 'text', msg: "Anomoly detected. Traffic flow halted. Initiating reroute protocols...", colorClass: "text-accent-danger" });
+    }, 5000);
+
+    // 15s: THE AI FIX
+    setTimeout(() => {
+      setSimStep(2);
+      setOptimized(true); // Auto-toggle
+      setPredictedCongestion(25); // GREEN
+      setPredictedSpeed(45);
+      setSuggestedAction("Rerouting 40% traffic via Mahim Causeway.");
+      addLog({ type: 'text', msg: "OPTIMIZATION: Rerouting 40% traffic via Mahim Causeway.", colorClass: "text-accent-success" });
+      addLog({ type: 'text', msg: "Equilibrium restored. Latency reducing.", colorClass: "text-accent-success" });
+    }, 15000);
+
+    // 30s: END
+    setTimeout(() => {
+      setSimulationMode(false);
+      setSimStep(0);
+      setOptimized(false);
+      addLog({ type: 'text', msg: "SIMULATION COMPLETE. RETURNING TO LIVE FEED.", colorClass: "text-slate-500" });
+      // Reset to idle/random
+      setPredictedCongestion(null);
+      setPredictedSpeed(null);
+    }, 30000);
+  };
+
+  // LOGIC FOR DYNAMIC METRICS (UPDATED FOR SIMULATION)
   useEffect(() => {
     if (predictedCongestion !== null && predictedSpeed !== null) {
       // Formula: Base Cost + (Congestion Score * Penalty Factor)
@@ -89,7 +140,7 @@ const App = () => {
       const fallbackThroughput = 50000 + Math.random() * 30000;
       setDisplayThroughput(fallbackThroughput);
     }
-  }, [predictedCongestion, predictedSpeed, metrics]); // Update when prediction changes or initial metrics load
+  }, [predictedCongestion, predictedSpeed, metrics, simStep]); // Depend on simStep too
 
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
@@ -438,6 +489,13 @@ const App = () => {
           </div>
         </div>
         {/* Header buttons removed as requested */}
+        <button
+          onClick={runDisasterSimulation}
+          disabled={simulationMode}
+          className={`px-4 py-2 rounded font-bold text-xs tracking-widest transition-all ${simulationMode ? 'bg-red-900/50 text-red-500 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 text-white animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.5)]'}`}
+        >
+          {simulationMode ? "SIMULATION RUNNING..." : "⚠️ RUN DISASTER SIMULATION"}
+        </button>
       </header>
 
       {/* Main Content Area */}
@@ -446,6 +504,20 @@ const App = () => {
 
         {/* Left/Center: Visualization Map */}
         <section className="flex-1 flex flex-col relative z-10 p-4 gap-4 overflow-hidden min-h-[50vh] lg:min-h-0">
+
+          {/* SIMULATION BANNER */}
+          {simulationMode && (
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 bg-red-600/90 text-white px-6 py-2 rounded-b-xl shadow-[0_0_30px_rgba(220,38,38,0.6)] backdrop-blur-md animate-in slide-in-from-top-full duration-500 border-x-2 border-b-2 border-red-400">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined animate-pulse">warning</span>
+                <div className="flex flex-col items-center">
+                  <span className="font-black tracking-[0.2em] text-sm">SIMULATION MODE ACTIVE</span>
+                  <span className="text-[10px] font-mono opacity-90">SCENARIO #4: SEA LINK BLOCKAGE</span>
+                </div>
+                <span className="material-symbols-outlined animate-pulse">warning</span>
+              </div>
+            </div>
+          )}
 
 
           {/* Visualization Viewport */}
