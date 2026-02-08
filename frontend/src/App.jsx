@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { MapContainer, TileLayer, Polyline, Tooltip } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import AnimatedPolyline from './AnimatedPolyline';
+import NetworkMap from './NetworkMap';
 
 const formatNumber = (val) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
@@ -577,7 +575,7 @@ const App = () => {
                   className="bg-transparent border-none text-white text-xs font-mono focus:ring-0 w-32 md:w-44 focus:outline-none appearance-none cursor-pointer"
                 >
                   <option value="" className="bg-background-dark">FROM: SELECT NODE</option>
-                  {(allNodes.length > 0 ? allNodes : [...new Set((data.links || []).map(l => l.source.id || l.source))]).sort().map(node => (
+                  {(allNodes.length > 0 ? allNodes : [...new Set((data.links || []).map(l => l?.source?.id || l?.source).filter(Boolean))]).sort().map(node => (
                     <option key={node} value={node} className="bg-background-dark">{node}</option>
                   ))}
                 </select>
@@ -591,7 +589,7 @@ const App = () => {
                   className="bg-transparent border-none text-white text-xs font-mono focus:ring-0 w-32 md:w-44 focus:outline-none appearance-none cursor-pointer"
                 >
                   <option value="" className="bg-background-dark">TO: SELECT NODE</option>
-                  {(allNodes.length > 0 ? allNodes : [...new Set((data.links || []).map(l => l.target.id || l.target))]).sort().map(node => (
+                  {(allNodes.length > 0 ? allNodes : [...new Set((data.links || []).map(l => l?.target?.id || l?.target).filter(Boolean))]).sort().map(node => (
                     <option key={node} value={node} className="bg-background-dark">{node}</option>
                   ))}
                 </select>
