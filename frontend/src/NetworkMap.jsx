@@ -1,167 +1,191 @@
-import React, { useState } from 'react';
+import React from 'react';
 
-// Schematic Coordinates (0-100% of container)
-const NODES = {
-    "Colaba": { x: 50, y: 95 },
-    "CST / Fort": { x: 50, y: 88 },
-    "Lower Parel": { x: 48, y: 78 },
-    "Worli": { x: 42, y: 75 },
-    "Dadar West": { x: 45, y: 70 },
-    "Dadar East": { x: 55, y: 70 },
-    "Bandra West": { x: 35, y: 60 },
-    "Bandra East": { x: 45, y: 60 },
-    "Sion": { x: 60, y: 60 },
-    "Kurla": { x: 65, y: 50 },
-    "Santacruz": { x: 35, y: 52 },
-    "Vile Parle": { x: 35, y: 45 },
-    "Andheri West": { x: 30, y: 38 },
-    "Andheri East": { x: 40, y: 38 },
-    "Goregaon": { x: 30, y: 28 },
-    "Malad": { x: 30, y: 20 },
-    "Borivali": { x: 30, y: 10 },
-    "Powai": { x: 60, y: 30 },
-    "Ghatkopar": { x: 70, y: 45 },
-    "Chembur": { x: 70, y: 55 }
-};
+// Static Metro-Style Network Data
+const NODES = [
+    { id: "Borivali", x: 20, y: 10 },
+    { id: "Malad", x: 20, y: 25 },
+    { id: "Andheri", x: 25, y: 40 },
+    { id: "Bandra", x: 30, y: 55 },
+    { id: "Dadar", x: 35, y: 70 },
+    { id: "Churchgate", x: 40, y: 85 },
+    { id: "Thane", x: 60, y: 15 },
+    { id: "Ghatkopar", x: 60, y: 40 },
+    { id: "Kurla", x: 50, y: 55 },
+    { id: "Vashi", x: 80, y: 60 }
+];
 
-const NetworkMap = ({ data, simulationTime, optimized, onNodeSelect, selectedSource, selectedTarget }) => {
-    const [hoveredNode, setHoveredNode] = useState(null);
+const EDGES = [
+    ["Borivali", "Malad"],
+    ["Malad", "Andheri"],
+    ["Andheri", "Bandra"],
+    ["Bandra", "Dadar"],
+    ["Dadar", "Churchgate"],
+    ["Thane", "Ghatkopar"],
+    ["Ghatkopar", "Kurla"],
+    ["Kurla", "Dadar"],
+    ["Dadar", "Vashi"] // The Sea Link
+];
 
-    // Link rendering logic
-    const renderLinks = () => {
-        if (!data || !data.links) return null;
+// Helper to get node coordinates by ID
+const getNodeById = (id) => NODES.find(n => n.id === id);
 
-        return data.links.map((link, idx) => {
-            if (!link || !link.source || !link.target) return null;
+const NetworkMap = ({
+    selectedSource,
+    selectedTarget,
+    optimized,
+    onNodeSelect,
+    simulationTime,
+    isPlaying
+}) => {
 
-            const sourceId = link.source.id || link.source;
-            const targetId = link.target.id || link.target;
+    // Determine if an edge is part of the selected route
+    const isEdgeOnRoute = (from, to) => {
+        if (!selectedSource || !selectedTarget) return false;
+        // Simple direct edge check (for more complex routes, use pathfinding)
+        return (from === selectedSource && to === selectedTarget) ||
+            (from === selectedTarget && to === selectedSource);
+    };
 
-            // Safety check for IDs
-            if (!sourceId || !targetId) return null;
+    // Calculate edge color and animation speed based on simulation
+    const getEdgeStyle = (from, to) => {
+        const isPeak = (simulationTime >= 8 && simulationTime <= 11) ||
+            (simulationTime >= 17 && simulationTime <= 20);
+        const onRoute = isEdgeOnRoute(from, to);
 
-            const start = NODES[sourceId];
-            const end = NODES[targetId];
-
-            if (!start || !end) return null;
-
-            // Simulation Logic
-            const isPeak = (simulationTime >= 8 && simulationTime <= 10) || (simulationTime >= 17 && simulationTime <= 20);
-            const congestionVal = link.congestion || 0;
-            const isCongested = (congestionVal > 70) || (isPeak && !optimized);
-
-            // Determine Animation Class
-            let animClass = "traffic-anim traffic-static"; // Default faint
-            let strokeColor = "#334155";
-
-            // If it's a main route or high congestion, animate it
-            if (isCongested) {
-                animClass = "traffic-anim slow";
-                strokeColor = "#ef4444";
-            } else if (optimized) {
-                animClass = "traffic-anim fast";
-                strokeColor = "#22c55e";
-            } else if (congestionVal < 40) {
-                animClass = "traffic-anim fast";
-                strokeColor = "#22c55e";
+        if (onRoute) {
+            if (optimized) {
+                return { className: 'flow-anim flow-fast', stroke: '#22c55e' }; // Green
             } else {
-                animClass = "traffic-anim";
-                strokeColor = "#f59e0b"; // Orange
+                return { className: 'flow-anim flow-slow', stroke: '#ef4444' }; // Red
             }
+        }
 
-            // Force re-render with key
-            const key = `${sourceId}-${targetId}-${Math.floor(simulationTime)}-${optimized}`;
-
-            return (
-                <g key={key}>
-                    {/* Main Line */}
-                    <line
-                        x1={`${start.x}%`} y1={`${start.y}%`}
-                        x2={`${end.x}%`} y2={`${end.y}%`}
-                        className={animClass}
-                        stroke={strokeColor}
-                        strokeWidth="3"
-                    />
-
-                    {/* Ghost Line (Optimized Traffic Split) */}
-                    {optimized && isCongested && (
-                        <path
-                            d={`M ${start.x} ${start.y} Q ${(start.x + end.x) / 2 + 5} ${(start.y + end.y) / 2 - 5} ${end.x} ${end.y}`}
-                            fill="none"
-                            stroke="#06b6d4"
-                            strokeWidth="2"
-                            strokeDasharray="5,5"
-                            className="opacity-60"
-                        >
-                            <animate attributeName="stroke-dashoffset" from="10" to="0" dur="1s" repeatCount="indefinite" />
-                        </path>
-                    )}
-                </g>
-            );
-        });
+        // Background edges
+        if (isPeak && !optimized) {
+            return { className: 'flow-anim flow-slow', stroke: '#f59e0b', opacity: 0.4 }; // Orange
+        }
+        return { className: '', stroke: '#334155', opacity: 0.3 }; // Dim gray
     };
 
     return (
         <div className="w-full h-full relative bg-slate-900 rounded-xl overflow-hidden border border-slate-700 shadow-2xl">
-            {/* Grid Pattern */}
-            <div className="absolute inset-0 schematic-grid opacity-30 pointer-events-none"></div>
+            {/* Grid Background */}
+            <div className="absolute inset-0 schematic-grid opacity-20 pointer-events-none"></div>
 
-            <svg className="w-full h-full">
-                {/* Render Links */}
-                {renderLinks()}
+            <svg
+                className="w-full h-full"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="xMidYMid meet"
+            >
+                {/* Render All Edges */}
+                {EDGES.map(([from, to], idx) => {
+                    const start = getNodeById(from);
+                    const end = getNodeById(to);
+                    if (!start || !end) return null;
 
-                {/* Render Nodes */}
-                {Object.entries(NODES).map(([name, pos]) => {
-                    const isSelected = name === selectedSource || name === selectedTarget;
+                    const style = getEdgeStyle(from, to);
+                    const isOnRoute = isEdgeOnRoute(from, to);
+
+                    return (
+                        <g key={`edge-${idx}`}>
+                            {/* Main Edge Line */}
+                            <line
+                                x1={start.x}
+                                y1={start.y}
+                                x2={end.x}
+                                y2={end.y}
+                                stroke={style.stroke}
+                                strokeWidth={isOnRoute ? 0.8 : 0.4}
+                                opacity={style.opacity || 1}
+                                className={style.className}
+                                strokeLinecap="round"
+                            />
+
+                            {/* Ghost Line for Optimized Traffic Split */}
+                            {isOnRoute && optimized && (
+                                <path
+                                    d={`M ${start.x} ${start.y} Q ${(start.x + end.x) / 2 + 3} ${(start.y + end.y) / 2 - 5} ${end.x} ${end.y}`}
+                                    fill="none"
+                                    stroke="#06b6d4"
+                                    strokeWidth="0.3"
+                                    strokeDasharray="1,1"
+                                    className="flow-anim flow-fast"
+                                    opacity="0.6"
+                                />
+                            )}
+                        </g>
+                    );
+                })}
+
+                {/* Render All Nodes */}
+                {NODES.map((node) => {
+                    const isSelected = node.id === selectedSource || node.id === selectedTarget;
+                    const isSource = node.id === selectedSource;
+                    const isTarget = node.id === selectedTarget;
+
                     return (
                         <g
-                            key={name}
-                            onClick={() => onNodeSelect(name)}
-                            onMouseEnter={() => setHoveredNode(name)}
-                            onMouseLeave={() => setHoveredNode(null)}
-                            className="cursor-pointer transition-all duration-300"
-                            style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+                            key={node.id}
+                            onClick={() => onNodeSelect(node.id)}
+                            className="cursor-pointer"
+                            style={{ transition: 'transform 0.2s' }}
                         >
+                            {/* Outer Glow for Selected Nodes */}
+                            {isSelected && (
+                                <circle
+                                    cx={node.x}
+                                    cy={node.y}
+                                    r="3"
+                                    fill="none"
+                                    stroke={isSource ? "#06b6d4" : "#f59e0b"}
+                                    strokeWidth="0.2"
+                                    opacity="0.5"
+                                    className="animate-pulse"
+                                />
+                            )}
+
+                            {/* Node Circle */}
                             <circle
-                                cx={`${pos.x}%`}
-                                cy={`${pos.y}%`}
-                                r={isSelected ? "8" : "5"}
-                                fill={isSelected ? "#06b6d4" : "#0f172a"}
+                                cx={node.x}
+                                cy={node.y}
+                                r={isSelected ? 1.8 : 1.2}
+                                fill={isSelected ? (isSource ? "#06b6d4" : "#f59e0b") : "#1e293b"}
                                 stroke={isSelected ? "#ffffff" : "#06b6d4"}
-                                strokeWidth={isSelected ? "3" : "2"}
-                                className={`${isSelected ? 'route-glow' : ''} hover:scale-150 transition-transform`}
+                                strokeWidth={isSelected ? 0.4 : 0.2}
                             />
-                            {/* Label */}
+
+                            {/* Node Label */}
                             <text
-                                x={`${pos.x}%`}
-                                y={`${pos.y + 4}%`}
+                                x={node.x}
+                                y={node.y + 4}
+                                fontSize="2"
                                 textAnchor="middle"
-                                fill="#94a3b8"
-                                fontSize="80%" // SVG coordinates relative to viewbox, using % for responsiveness
-                                className="text-[10px] font-mono pointer-events-none uppercase tracking-wider font-bold"
+                                fill={isSelected ? "#ffffff" : "#64748b"}
+                                className="font-mono font-bold uppercase"
+                                style={{ pointerEvents: 'none' }}
                             >
-                                {name}
+                                {node.id}
                             </text>
                         </g>
                     );
                 })}
             </svg>
 
-            {/* Hover Tooltip */}
-            {hoveredNode && (
-                <div
-                    className="absolute z-50 pointer-events-none bg-slate-900/90 border border-cyan-500/50 p-2 rounded text-xs text-cyan-400 font-mono shadow-[0_0_15px_rgba(6,182,212,0.3)] backdrop-blur-sm"
-                    style={{
-                        left: `${NODES[hoveredNode].x}%`,
-                        top: `${NODES[hoveredNode].y - 8}%`,
-                        transform: 'translateX(-50%)'
-                    }}
-                >
-                    <div className="font-bold text-white mb-1">{hoveredNode}</div>
-                    <div>STATUS: ONLINE</div>
-                    <div>LOAD: {Math.floor(Math.random() * 40 + 40)}%</div>
+            {/* Legend */}
+            <div className="absolute bottom-2 left-2 flex items-center gap-4 text-[8px] font-mono text-slate-500 bg-slate-900/80 px-2 py-1 rounded">
+                <div className="flex items-center gap-1">
+                    <div className="w-3 h-0.5 bg-green-500"></div>
+                    <span>OPTIMIZED</span>
                 </div>
-            )}
+                <div className="flex items-center gap-1">
+                    <div className="w-3 h-0.5 bg-red-500"></div>
+                    <span>CONGESTED</span>
+                </div>
+                <div className="flex items-center gap-1">
+                    <div className="w-3 h-0.5 bg-cyan-500 opacity-50"></div>
+                    <span>SPLIT</span>
+                </div>
+            </div>
         </div>
     );
 };

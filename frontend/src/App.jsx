@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import NetworkGraph from './NetworkGraph';
+import NetworkMap from './NetworkMap';
 
 const formatNumber = (val) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
@@ -543,13 +543,14 @@ const App = () => {
         <section className="flex-1 flex flex-col relative z-10 p-4 gap-4 overflow-hidden min-h-[50vh] lg:min-h-0">
 
 
-          {/* Visualization Viewport - Cyberpunk Schematic */}
-          <NetworkGraph
-            data={data}
+          {/* Visualization Viewport - Metro-Style Network */}
+          <NetworkMap
             selectedSource={selectedSource}
             selectedTarget={selectedTarget}
             optimized={optimized}
             onNodeSelect={handleNodeSelect}
+            simulationTime={simulationTime}
+            isPlaying={isPlaying}
           />
 
           {/* Map Controls (Moved after map for proper stacking) */}
