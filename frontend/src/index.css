@@ -159,10 +159,8 @@ input:checked+.slider:before {
   letter-spacing: 0.1em;
 }
 
-/* ===== TRAFFIC FLOW ANIMATION (Nuclear Override) ===== */
-/* Targets SVG path elements directly with !important to override Leaflet */
-
-@keyframes flowAnimation {
+/* ===== TRAFFIC FLOW ANIMATION (Nuclear Fix) ===== */
+@keyframes flowAnim {
   from {
     stroke-dashoffset: 20;
   }
@@ -172,44 +170,26 @@ input:checked+.slider:before {
   }
 }
 
-/* Base Animation Class - Applied to all animated routes */
-path.traffic-flow-anim {
-  stroke-dasharray: 10, 20 !important;
-  animation: flowAnimation 1s linear infinite !important;
+/* Base Animation - Applied to all animated routes */
+path.traffic-anim {
+  stroke-dasharray: 12, 12 !important;
+  animation: flowAnim 1s linear infinite !important;
   stroke-linecap: round !important;
 }
 
-/* Fast Speed (Green) - Free flow traffic */
-path.traffic-flow-anim.flow-fast {
+/* FAST (Green) - Free flow */
+path.traffic-anim.fast {
   stroke: #22c55e !important;
   animation-duration: 0.5s !important;
-  filter: drop-shadow(0 0 3px #22c55e);
+  filter: drop-shadow(0 0 4px #22c55e);
 }
 
-/* Medium Speed (Orange) - Moderate traffic */
-path.traffic-flow-anim.flow-medium {
-  stroke: #f59e0b !important;
-  animation-duration: 1.2s !important;
-}
-
-/* Slow Speed (Red) - Jammed traffic */
-path.traffic-flow-anim.flow-slow {
+/* SLOW (Red) - Jammed traffic */
+path.traffic-anim.slow {
   stroke: #ef4444 !important;
-  animation-duration: 3s !important;
-  filter: drop-shadow(0 0 4px #ef4444);
-}
-
-/* Optimized Flow - AI-controlled, always fast green with glow */
-path.traffic-flow-anim.flow-optimized {
-  stroke: #10b981 !important;
-  animation-duration: 0.3s !important;
-  filter: drop-shadow(0 0 6px #10b981);
+  animation-duration: 4s !important;
   stroke-width: 6px !important;
-}
-
-/* Glow effect for active routes */
-.route-glow path {
-  filter: drop-shadow(0 0 6px currentColor);
+  filter: drop-shadow(0 0 4px #ef4444);
 }
 
 /* ===== METRIC CARD FLASH ANIMATION ===== */

@@ -57,6 +57,12 @@ const App = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [simulationSpeed, setSimulationSpeed] = useState(1); // 1x, 5x, 10x
   const [metricFlash, setMetricFlash] = useState(false); // For flash animation
+  const [trafficMetrics, setTrafficMetrics] = useState({
+    congestion: "15.0",
+    cost: "42,000",
+    latency: "NORMAL",
+    throughput: "72,000"
+  });
   const [selectedSource, setSelectedSource] = useState('');
   const [selectedTarget, setSelectedTarget] = useState('');
   const [userQuery, setUserQuery] = useState('');
@@ -238,6 +244,23 @@ const App = () => {
           optimized_cost: newOptCost,
           total_throughput: isPeakHour ? 85000 + Math.random() * 10000 : 45000 + Math.random() * 10000
         };
+      });
+
+      // DYNAMIC CARD UPDATES - Live traffic metrics
+      const hour = simulationTime;
+      const isPeakHour = (hour >= 8 && hour <= 11) || (hour >= 17 && hour <= 20);
+      const timeMultiplier = isPeakHour ? 1.5 : 1.0;
+      const optimizationFactor = optimized ? 0.8 : 1.0;
+
+      const currentCongestion = 15 * timeMultiplier * optimizationFactor;
+      const currentCost = Math.floor(42000 * timeMultiplier * optimizationFactor);
+      const isCongested = isPeakHour && !optimized;
+
+      setTrafficMetrics({
+        congestion: currentCongestion.toFixed(1),
+        cost: currentCost.toLocaleString('en-IN'),
+        latency: isCongested ? "HIGH (+45%)" : "NORMAL",
+        throughput: Math.floor(72000 / (timeMultiplier * optimizationFactor)).toLocaleString('en-IN')
       });
     }, intervalMs);
 
@@ -580,29 +603,24 @@ const App = () => {
                   opacity = 0.8;
                 }
 
-                // Determine flow animation class based on congestion
-                const isPeakHour = (simulationTime >= 8 && simulationTime <= 11) || (simulationTime >= 17 && simulationTime <= 20);
-                const isCongested = link.congestion > 70 || (isPeakHour && !optimized);
-                let flowClass = '';
-
-                if (isPathSegment || isSelected) {
-                  if (optimized) {
-                    flowClass = 'traffic-flow-anim flow-optimized';
-                  } else if (isCongested || link.congestion > 60) {
-                    flowClass = 'traffic-flow-anim flow-slow';
-                  } else if (link.congestion > 30) {
-                    flowClass = 'traffic-flow-anim flow-medium';
-                  } else {
-                    flowClass = 'traffic-flow-anim flow-fast';
-                  }
-                }
+                // Determine flow animation class - SIMPLIFIED
+                const isPeak = (simulationTime >= 8 && simulationTime <= 10) || (simulationTime >= 17 && simulationTime <= 20);
+                const isCongested = isPeak && !optimized;
+                const animClass = (isPathSegment || isSelected)
+                  ? (isCongested ? "traffic-anim slow" : "traffic-anim fast")
+                  : "";
 
                 return (
                   <AnimatedPolyline
-                    key={idx}
+                    key={`${idx}-${Math.floor(simulationTime)}-${optimized}`}
                     positions={[startCoord, endCoord]}
-                    pathOptions={{ color, weight, opacity }}
-                    flowClass={flowClass}
+                    pathOptions={{
+                      className: animClass,
+                      color: isCongested ? "#ef4444" : (optimized ? "#22c55e" : color),
+                      weight: (isPathSegment || isSelected) ? 6 : weight,
+                      opacity: 1.0
+                    }}
+                    flowClass={animClass}
                     eventHandlers={{
                       click: () => {
                         setSelectedSource(link.source.id || link.source);
