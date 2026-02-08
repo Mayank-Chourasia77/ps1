@@ -293,6 +293,11 @@ const App = () => {
       const res = await axios.get('http://127.0.0.1:8000/traffic-status');
       const { edges, metrics: apiMetrics, bottleneck_edge } = res.data;
 
+      if (!edges || !Array.isArray(edges)) {
+        console.warn("Invalid traffic data received:", res.data);
+        return;
+      }
+
       const nodesSet = new Set();
       edges.forEach(l => {
         nodesSet.add(l.from);
