@@ -1,70 +1,82 @@
 import React from 'react';
 
-// Static Metro-Style Network Data
-const NODES = [
-    { id: "Borivali", x: 20, y: 10 },
-    { id: "Malad", x: 20, y: 25 },
-    { id: "Andheri", x: 25, y: 40 },
-    { id: "Bandra", x: 30, y: 55 },
-    { id: "Dadar", x: 35, y: 70 },
-    { id: "Churchgate", x: 40, y: 85 },
-    { id: "Thane", x: 60, y: 15 },
-    { id: "Ghatkopar", x: 60, y: 40 },
-    { id: "Kurla", x: 50, y: 55 },
-    { id: "Vashi", x: 80, y: 60 }
+// Real Mumbai Schematic - Geographically Accurate
+const STATIONS = [
+    { id: "Borivali", x: 30, y: 10 },
+    { id: "Malad", x: 30, y: 20 },
+    { id: "Andheri", x: 35, y: 35 }, // Hub
+    { id: "Bandra", x: 30, y: 50 },
+    { id: "Dadar", x: 35, y: 65 },
+    { id: "Lower Parel", x: 30, y: 75 },
+    { id: "Churchgate", x: 35, y: 90 },
+    { id: "Thane", x: 70, y: 15 }, // Eastern Suburbs
+    { id: "Ghatkopar", x: 70, y: 35 },
+    { id: "Kurla", x: 60, y: 50 },
+    { id: "Vashi", x: 85, y: 60 }
 ];
 
-const EDGES = [
+const CONNECTIONS = [
+    // Western Line (The Main Backbone)
     ["Borivali", "Malad"],
     ["Malad", "Andheri"],
     ["Andheri", "Bandra"],
     ["Bandra", "Dadar"],
-    ["Dadar", "Churchgate"],
+    ["Dadar", "Lower Parel"],
+    ["Lower Parel", "Churchgate"],
+    // Eastern / Central Line
     ["Thane", "Ghatkopar"],
     ["Ghatkopar", "Kurla"],
     ["Kurla", "Dadar"],
-    ["Dadar", "Vashi"] // The Sea Link
+    // Key Connectors
+    ["Andheri", "Ghatkopar"], // Metro Link
+    ["Bandra", "Kurla"], // BKC Connector
+    ["Dadar", "Vashi"] // Harbour Link
 ];
 
-// Helper to get node coordinates by ID
-const getNodeById = (id) => NODES.find(n => n.id === id);
+// Helper to get station coordinates by ID
+const getStation = (id) => STATIONS.find(s => s.id === id);
+
+// Simple pathfinding: Find all edges on a route between two stations
+const findPath = (from, to) => {
+    // BFS for shortest path
+    const visited = new Set();
+    const queue = [[from, []]];
+
+    while (queue.length > 0) {
+        const [current, path] = queue.shift();
+        if (current === to) return path;
+        if (visited.has(current)) continue;
+        visited.add(current);
+
+        for (const [a, b] of CONNECTIONS) {
+            let next = null;
+            if (a === current && !visited.has(b)) next = b;
+            if (b === current && !visited.has(a)) next = a;
+            if (next) {
+                queue.push([next, [...path, [current, next]]]);
+            }
+        }
+    }
+    return [];
+};
 
 const NetworkMap = ({
     selectedSource,
     selectedTarget,
     optimized,
     onNodeSelect,
-    simulationTime,
-    isPlaying
+    simulationTime
 }) => {
+    // Calculate the active path
+    const activePath = (selectedSource && selectedTarget)
+        ? findPath(selectedSource, selectedTarget)
+        : [];
 
-    // Determine if an edge is part of the selected route
-    const isEdgeOnRoute = (from, to) => {
-        if (!selectedSource || !selectedTarget) return false;
-        // Simple direct edge check (for more complex routes, use pathfinding)
-        return (from === selectedSource && to === selectedTarget) ||
-            (from === selectedTarget && to === selectedSource);
-    };
-
-    // Calculate edge color and animation speed based on simulation
-    const getEdgeStyle = (from, to) => {
-        const isPeak = (simulationTime >= 8 && simulationTime <= 11) ||
-            (simulationTime >= 17 && simulationTime <= 20);
-        const onRoute = isEdgeOnRoute(from, to);
-
-        if (onRoute) {
-            if (optimized) {
-                return { className: 'flow-anim flow-fast', stroke: '#22c55e' }; // Green
-            } else {
-                return { className: 'flow-anim flow-slow', stroke: '#ef4444' }; // Red
-            }
-        }
-
-        // Background edges
-        if (isPeak && !optimized) {
-            return { className: 'flow-anim flow-slow', stroke: '#f59e0b', opacity: 0.4 }; // Orange
-        }
-        return { className: '', stroke: '#334155', opacity: 0.3 }; // Dim gray
+    // Check if an edge is on the active path
+    const isEdgeOnPath = (from, to) => {
+        return activePath.some(([a, b]) =>
+            (a === from && b === to) || (a === to && b === from)
+        );
     };
 
     return (
@@ -77,94 +89,114 @@ const NetworkMap = ({
                 viewBox="0 0 100 100"
                 preserveAspectRatio="xMidYMid meet"
             >
-                {/* Render All Edges */}
-                {EDGES.map(([from, to], idx) => {
-                    const start = getNodeById(from);
-                    const end = getNodeById(to);
+                {/* Render All Connections (Grey Background) */}
+                {CONNECTIONS.map(([from, to], idx) => {
+                    const start = getStation(from);
+                    const end = getStation(to);
                     if (!start || !end) return null;
 
-                    const style = getEdgeStyle(from, to);
-                    const isOnRoute = isEdgeOnRoute(from, to);
+                    const onPath = isEdgeOnPath(from, to);
+
+                    // Determine style based on mode
+                    let strokeColor = "#334155"; // Default grey
+                    let animClass = "";
+                    let strokeWidth = 0.4;
+                    let opacity = 0.3;
+
+                    if (onPath) {
+                        strokeWidth = 1;
+                        opacity = 1;
+                        if (optimized) {
+                            strokeColor = "#22c55e"; // Green
+                            animClass = "flow-line anim-fast";
+                        } else {
+                            strokeColor = "#ef4444"; // Red
+                            animClass = "flow-line anim-slow";
+                        }
+                    }
 
                     return (
-                        <g key={`edge-${idx}`}>
-                            {/* Main Edge Line */}
-                            <line
-                                x1={start.x}
-                                y1={start.y}
-                                x2={end.x}
-                                y2={end.y}
-                                stroke={style.stroke}
-                                strokeWidth={isOnRoute ? 0.8 : 0.4}
-                                opacity={style.opacity || 1}
-                                className={style.className}
-                                strokeLinecap="round"
-                            />
-
-                            {/* Ghost Line for Optimized Traffic Split */}
-                            {isOnRoute && optimized && (
-                                <path
-                                    d={`M ${start.x} ${start.y} Q ${(start.x + end.x) / 2 + 3} ${(start.y + end.y) / 2 - 5} ${end.x} ${end.y}`}
-                                    fill="none"
-                                    stroke="#06b6d4"
-                                    strokeWidth="0.3"
-                                    strokeDasharray="1,1"
-                                    className="flow-anim flow-fast"
-                                    opacity="0.6"
-                                />
-                            )}
-                        </g>
+                        <line
+                            key={`conn-${idx}`}
+                            x1={start.x}
+                            y1={start.y}
+                            x2={end.x}
+                            y2={end.y}
+                            stroke={strokeColor}
+                            strokeWidth={strokeWidth}
+                            opacity={opacity}
+                            className={animClass}
+                            strokeLinecap="round"
+                        />
                     );
                 })}
 
-                {/* Render All Nodes */}
-                {NODES.map((node) => {
-                    const isSelected = node.id === selectedSource || node.id === selectedTarget;
-                    const isSource = node.id === selectedSource;
-                    const isTarget = node.id === selectedTarget;
+                {/* Ghost Line for Optimized Mode (Traffic Split Visualizer) */}
+                {optimized && activePath.length > 0 && activePath.map(([from, to], idx) => {
+                    const start = getStation(from);
+                    const end = getStation(to);
+                    if (!start || !end) return null;
+
+                    return (
+                        <path
+                            key={`ghost-${idx}`}
+                            d={`M ${start.x} ${start.y} Q ${(start.x + end.x) / 2 + 4} ${(start.y + end.y) / 2 - 4} ${end.x} ${end.y}`}
+                            fill="none"
+                            stroke="#06b6d4"
+                            strokeWidth="0.3"
+                            strokeDasharray="1,1"
+                            className="flow-line anim-fast"
+                            opacity="0.5"
+                        />
+                    );
+                })}
+
+                {/* Render All Stations */}
+                {STATIONS.map((station) => {
+                    const isSelected = station.id === selectedSource || station.id === selectedTarget;
+                    const isSource = station.id === selectedSource;
 
                     return (
                         <g
-                            key={node.id}
-                            onClick={() => onNodeSelect(node.id)}
+                            key={station.id}
+                            onClick={() => onNodeSelect(station.id)}
                             className="cursor-pointer"
-                            style={{ transition: 'transform 0.2s' }}
                         >
-                            {/* Outer Glow for Selected Nodes */}
+                            {/* Outer Glow */}
                             {isSelected && (
                                 <circle
-                                    cx={node.x}
-                                    cy={node.y}
-                                    r="3"
+                                    cx={station.x}
+                                    cy={station.y}
+                                    r="3.5"
                                     fill="none"
                                     stroke={isSource ? "#06b6d4" : "#f59e0b"}
-                                    strokeWidth="0.2"
-                                    opacity="0.5"
+                                    strokeWidth="0.15"
+                                    opacity="0.6"
                                     className="animate-pulse"
                                 />
                             )}
 
-                            {/* Node Circle */}
+                            {/* Station Dot */}
                             <circle
-                                cx={node.x}
-                                cy={node.y}
-                                r={isSelected ? 1.8 : 1.2}
+                                cx={station.x}
+                                cy={station.y}
+                                r={isSelected ? 2 : 1.2}
                                 fill={isSelected ? (isSource ? "#06b6d4" : "#f59e0b") : "#1e293b"}
                                 stroke={isSelected ? "#ffffff" : "#06b6d4"}
-                                strokeWidth={isSelected ? 0.4 : 0.2}
+                                strokeWidth={isSelected ? 0.3 : 0.15}
                             />
 
-                            {/* Node Label */}
+                            {/* Station Label */}
                             <text
-                                x={node.x}
-                                y={node.y + 4}
-                                fontSize="2"
+                                x={station.x}
+                                y={station.y + 4.5}
+                                fontSize="2.2"
                                 textAnchor="middle"
                                 fill={isSelected ? "#ffffff" : "#64748b"}
                                 className="font-mono font-bold uppercase"
                                 style={{ pointerEvents: 'none' }}
                             >
-                                {node.id}
+                                {station.id}
                             </text>
                         </g>
                     );
@@ -172,19 +204,24 @@ const NetworkMap = ({
             </svg>
 
             {/* Legend */}
-            <div className="absolute bottom-2 left-2 flex items-center gap-4 text-[8px] font-mono text-slate-500 bg-slate-900/80 px-2 py-1 rounded">
-                <div className="flex items-center gap-1">
-                    <div className="w-3 h-0.5 bg-green-500"></div>
+            <div className="absolute bottom-2 left-2 flex items-center gap-4 text-[8px] font-mono text-slate-400 bg-slate-900/90 px-3 py-1.5 rounded border border-slate-700">
+                <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-0.5 bg-red-500"></div>
+                    <span>CURRENT (JAM)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-0.5 bg-green-500"></div>
                     <span>OPTIMIZED</span>
                 </div>
-                <div className="flex items-center gap-1">
-                    <div className="w-3 h-0.5 bg-red-500"></div>
-                    <span>CONGESTED</span>
-                </div>
-                <div className="flex items-center gap-1">
-                    <div className="w-3 h-0.5 bg-cyan-500 opacity-50"></div>
+                <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-0.5 bg-cyan-500 opacity-60"></div>
                     <span>SPLIT</span>
                 </div>
+            </div>
+
+            {/* Title */}
+            <div className="absolute top-2 left-2 text-[9px] font-mono text-slate-500 uppercase tracking-widest">
+                Mumbai Rail Network // Schematic
             </div>
         </div>
     );

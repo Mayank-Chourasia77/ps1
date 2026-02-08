@@ -184,31 +184,27 @@ const App = () => {
     return () => clearInterval(interval);
   }, [isPlaying, simulationSpeed]);
 
-  // --- METRICS UPDATE (Strict Binding) ---
+  // --- METRICS UPDATE (Strict Hardcoded Values) ---
   useEffect(() => {
-    const hour = simulationTime;
-    const isPeak = (hour >= 8 && hour <= 11) || (hour >= 17 && hour <= 20);
-
-    // STRICT LOGIC:
-    // congestion = isPeak ? (isOptimized ? 15 : 85) : 10
-    const congestionVal = isPeak ? (optimized ? 15 : 85) : 10;
-
-    // cost = congestion * 450
-    const costVal = congestionVal * 450;
-
-    // Throughput inverse to congestion roughly? Or just static logic?
-    // User didn't specify throughput, but I should keep it dynamic.
-    // Let's say throughput = 100000 - (congestion * 800)
-    const throughputVal = 100000 - (congestionVal * 800);
-
-    setTrafficMetrics({
-      congestion: congestionVal.toFixed(1),
-      cost: costVal.toLocaleString('en-IN'),
-      latency: isPeak && !optimized ? "HIGH" : "NORMAL",
-      throughput: throughputVal.toLocaleString('en-IN')
-    });
-
-  }, [simulationTime, optimized]);
+    // EXACT VALUES PER USER SPECIFICATION:
+    if (optimized) {
+      // OPTIMIZED MODE: Healthy metrics
+      setTrafficMetrics({
+        congestion: "12",
+        cost: "4,20,000",
+        latency: "+2 min",
+        throughput: "92,000"
+      });
+    } else {
+      // CURRENT MODE: Critical metrics
+      setTrafficMetrics({
+        congestion: "88",
+        cost: "12,45,000",
+        latency: "+45 min",
+        throughput: "32,000"
+      });
+    }
+  }, [optimized]);
 
   // --- SYNCHRONIZED SIMULATION LOOP (BPR Formula) ---
   // This useEffect is modified to only update the data (links congestion)

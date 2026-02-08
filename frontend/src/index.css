@@ -159,6 +159,30 @@ input:checked+.slider:before {
   letter-spacing: 0.1em;
 }
 
+/* Flow Line Animations (Metro Style) */
+@keyframes flowDash {
+  from {
+    stroke-dashoffset: 12;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.flow-line {
+  stroke-dasharray: 8, 4;
+  stroke-linecap: round;
+}
+
+.anim-slow {
+  animation: flowDash 3s linear infinite;
+}
+
+.anim-fast {
+  animation: flowDash 0.4s linear infinite;
+}
+
 /* Packet Tracer Animation */
 @keyframes march {
   from {
