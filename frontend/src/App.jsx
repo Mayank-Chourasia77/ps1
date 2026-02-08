@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { MapContainer, TileLayer, Polyline, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import AntPath from './AntPath';
 
 const formatNumber = (val) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
@@ -50,6 +51,10 @@ const App = () => {
   const [optimized, setOptimized] = useState(false);
   const [insightLog, setInsightLog] = useState([]);
   const [congestionMode, setCongestionMode] = useState(false);
+
+  // --- SIMULATION STATE ---
+  const [simulationTime, setSimulationTime] = useState(8); // 8:00 AM
+  const [isPlaying, setIsPlaying] = useState(false);
   const [selectedSource, setSelectedSource] = useState('');
   const [selectedTarget, setSelectedTarget] = useState('');
   const [userQuery, setUserQuery] = useState('');
@@ -147,6 +152,45 @@ const App = () => {
     fetchData();
     fetchNodes();
   }, []);
+
+  // --- SIMULATION TIME LOOP ---
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const interval = setInterval(() => {
+      setSimulationTime(prev => {
+        const next = prev + 0.25; // 15 min increments
+        if (next >= 24) return 8; // Reset to 8 AM
+        return next;
+      });
+
+      // Update congestion based on time of day
+      setData(prevData => {
+        if (!prevData || !prevData.links) return prevData;
+
+        const hour = simulationTime;
+        let multiplier = 1.0;
+
+        // Peak hours: 8-10 AM and 5-8 PM
+        if ((hour >= 8 && hour <= 10) || (hour >= 17 && hour <= 20)) {
+          multiplier = 1.05; // 5% increase per step
+        } else if (hour >= 11 && hour <= 16) {
+          multiplier = 0.95; // 5% decrease
+        }
+
+        return {
+          ...prevData,
+          links: prevData.links.map(link => ({
+            ...link,
+            congestion: Math.max(10, Math.min(95, link.congestion * multiplier))
+          }))
+        };
+      });
+    }, 2000); // Every 2 seconds = 15 mins simulation time
+
+    return () => clearInterval(interval);
+  }, [isPlaying, simulationTime]);
+
 
   const fetchNodes = async () => {
     try {
@@ -483,6 +527,33 @@ const App = () => {
                   opacity = 0.8;
                 }
 
+                // Calculate animation delay based on congestion (lower delay = faster flow)
+                const delay = link.congestion > 60 ? 2000 : (link.congestion > 30 ? 1000 : 400);
+
+                // Use AntPath for path segments (animated), Polyline for non-path
+                if (isPathSegment) {
+                  return (
+                    <AntPath
+                      key={idx}
+                      positions={[startCoord, endCoord]}
+                      options={{
+                        color: color,
+                        pulseColor: '#ffffff',
+                        weight: weight,
+                        opacity: opacity,
+                        delay: optimized ? 300 : delay,
+                        dashArray: [10, 20]
+                      }}
+                      eventHandlers={{
+                        click: () => {
+                          setSelectedSource(link.source.id || link.source);
+                          setSelectedTarget(link.target.id || link.target);
+                        }
+                      }}
+                    />
+                  );
+                }
+
                 return (
                   <Polyline
                     key={idx}
@@ -576,8 +647,8 @@ const App = () => {
                 className={`group relative px-6 py-2 rounded-lg transition-all duration-300 ${!optimized ? 'bg-primary/20 border border-primary/50' : 'hover:bg-white/5'}`}
               >
                 <div className="relative z-10 flex flex-col items-center">
-                  <span className={`text-[10px] font-bold tracking-[0.2em] ${!optimized ? 'text-primary' : 'text-slate-500'}`}>CURRENT</span>
-                  <span className={`text-[8px] font-mono ${!optimized ? 'text-primary/70' : 'text-slate-600'}`}>HUMAN BASELINE</span>
+                  <span className={`text-sm font-bold tracking-[0.2em] ${!optimized ? 'text-primary' : 'text-slate-500'}`}>CURRENT</span>
+                  <span className={`text-[9px] font-mono ${!optimized ? 'text-primary/70' : 'text-slate-600'}`}>HUMAN BASELINE</span>
                 </div>
               </button>
               <button
@@ -585,10 +656,34 @@ const App = () => {
                 className={`group relative px-6 py-2 rounded-lg transition-all duration-300 ${optimized ? 'bg-accent-success/20 border border-accent-success/50' : 'hover:bg-white/5'}`}
               >
                 <div className="relative z-10 flex flex-col items-center">
-                  <span className={`text-[10px] font-bold tracking-[0.2em] ${optimized ? 'text-accent-success' : 'text-slate-500'}`}>OPTIMIZED</span>
-                  <span className={`text-[8px] font-mono ${optimized ? 'text-accent-success/70' : 'text-slate-600'}`}>AI SYSTEM</span>
+                  <span className={`text-sm font-bold tracking-[0.2em] ${optimized ? 'text-accent-success' : 'text-slate-500'}`}>OPTIMIZED</span>
+                  <span className={`text-[9px] font-mono ${optimized ? 'text-accent-success/70' : 'text-slate-600'}`}>AI SYSTEM</span>
                 </div>
               </button>
+            </div>
+
+            {/* Timeline Player - Packet Tracer Simulation */}
+            <div className="pointer-events-auto glass-panel p-2 rounded-xl shadow-2xl flex items-center gap-3 border border-accent-warning/40 bg-[#101d23]/90 mt-2">
+              <button
+                onClick={() => setIsPlaying(!isPlaying)}
+                className={`p-2 rounded-lg transition-all ${isPlaying ? 'bg-accent-danger/20 text-accent-danger' : 'bg-accent-success/20 text-accent-success'}`}
+                title={isPlaying ? "Pause Simulation" : "Start Simulation"}
+              >
+                <span className="material-symbols-outlined text-lg">{isPlaying ? 'pause' : 'play_arrow'}</span>
+              </button>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] text-slate-500 font-mono tracking-widest">SIMULATION TIME</span>
+                <span className="text-lg font-bold text-accent-warning font-mono">
+                  {String(Math.floor(simulationTime)).padStart(2, '0')}:{String(Math.round((simulationTime % 1) * 60)).padStart(2, '0')}
+                </span>
+              </div>
+              <div className="flex flex-col items-center px-2">
+                <span className="text-[9px] text-slate-600 font-mono">
+                  {simulationTime >= 8 && simulationTime <= 10 ? '🔴 PEAK' :
+                    simulationTime >= 17 && simulationTime <= 20 ? '🔴 PEAK' :
+                      '🟢 NORMAL'}
+                </span>
+              </div>
             </div>
 
             <div className="pointer-events-auto flex flex-col gap-2">
