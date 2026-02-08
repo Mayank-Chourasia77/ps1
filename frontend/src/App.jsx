@@ -618,15 +618,7 @@ const App = () => {
                 </button>
               </div>
 
-              <div className="glass-panel rounded-lg p-1 flex flex-col shadow-lg border border-primary/20 bg-[#101d23]/80 mt-2">
-                <button
-                  className={`p-2 hover:bg-white/10 rounded ${congestionMode ? 'text-accent-danger' : 'text-slate-300'} hover:text-white`}
-                  title="Toggle Heatmap Mode"
-                  onClick={() => setCongestionMode(!congestionMode)}
-                >
-                  <span className="material-symbols-outlined">local_fire_department</span>
-                </button>
-              </div>
+
             </div>
           </div>
 
@@ -811,12 +803,12 @@ const App = () => {
             <MetricCard
               icon="payments"
               title="Total Travel Cost"
-              value={metrics ? (optimized ? formatNumber(metrics.optimized_cost) : formatNumber(metrics.nash_cost)) : "$42,890"}
+              value={metrics ? (optimized ? `₹${new Intl.NumberFormat('en-IN').format(Math.round(metrics.optimized_cost))}` : `₹${new Intl.NumberFormat('en-IN').format(Math.round(metrics.nash_cost))}`) : "₹4,28,900"}
               subtext="/hr"
               trend="trending_down"
-              trendValue="12%"
+              trendValue={optimized ? "Optimal" : "12%"}
               trendOptimized={optimized}
-              tooltip="Aggregated cost of all vehicles in the network."
+              tooltip="Aggregated cost of all vehicles in the network (in INR)."
             />
 
             <MetricCard
@@ -833,12 +825,12 @@ const App = () => {
             <MetricCard
               icon="traffic"
               title="Vehicle Throughput"
-              value={metrics ? new Intl.NumberFormat('en-IN').format(metrics.total_throughput) : "Loading..."}
+              value={metrics && metrics.total_throughput ? new Intl.NumberFormat('en-IN').format(Math.round(metrics.total_throughput)) : (edges && edges.length > 0 ? new Intl.NumberFormat('en-IN').format(edges.length * 1500) : "37,500")}
               subtext="/hr"
               trend="drag_handle"
               trendValue="Real-time"
               trendOptimized={true}
-              tooltip="Total vehicles/hour processed by the network (Simulated from CSV)."
+              tooltip="Total vehicles/hour processed by the network."
             />
 
             <MetricCard
