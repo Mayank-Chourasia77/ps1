@@ -242,7 +242,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👥 Team
 
-- **Mayank Chourasia** - Lead Developer
+- **Mayank Chourasia**
+- **Parth Gupta**
 
 ---
 
