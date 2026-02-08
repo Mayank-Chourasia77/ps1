@@ -159,37 +159,52 @@ input:checked+.slider:before {
   letter-spacing: 0.1em;
 }
 
-/* ===== TRAFFIC FLOW ANIMATION (Packet Tracer Effect) ===== */
+/* ===== TRAFFIC FLOW ANIMATION (Nuclear Override) ===== */
+/* Targets SVG path elements directly with !important to override Leaflet */
+
 @keyframes flowAnimation {
+  from {
+    stroke-dashoffset: 20;
+  }
+
   to {
-    stroke-dashoffset: -30;
+    stroke-dashoffset: 0;
   }
 }
 
-/* Fast flow - Green roads, free traffic */
-.traffic-flow-fast path {
+/* Base Animation Class - Applied to all animated routes */
+path.traffic-flow-anim {
   stroke-dasharray: 10, 20 !important;
-  animation: flowAnimation 0.4s linear infinite !important;
+  animation: flowAnimation 1s linear infinite !important;
+  stroke-linecap: round !important;
 }
 
-/* Medium flow - Orange roads, moderate traffic */
-.traffic-flow-medium path {
-  stroke-dasharray: 8, 15 !important;
-  animation: flowAnimation 1.0s linear infinite !important;
+/* Fast Speed (Green) - Free flow traffic */
+path.traffic-flow-anim.flow-fast {
+  stroke: #22c55e !important;
+  animation-duration: 0.5s !important;
+  filter: drop-shadow(0 0 3px #22c55e);
 }
 
-/* Slow flow - Red roads, jammed traffic */
-.traffic-flow-slow path {
-  stroke-dasharray: 5, 10 !important;
-  animation: flowAnimation 2.5s linear infinite !important;
-  opacity: 0.85;
+/* Medium Speed (Orange) - Moderate traffic */
+path.traffic-flow-anim.flow-medium {
+  stroke: #f59e0b !important;
+  animation-duration: 1.2s !important;
 }
 
-/* Optimized flow - Always fast and green */
-.traffic-flow-optimized path {
-  stroke-dasharray: 12, 18 !important;
-  animation: flowAnimation 0.3s linear infinite !important;
-  filter: drop-shadow(0 0 4px #10b981);
+/* Slow Speed (Red) - Jammed traffic */
+path.traffic-flow-anim.flow-slow {
+  stroke: #ef4444 !important;
+  animation-duration: 3s !important;
+  filter: drop-shadow(0 0 4px #ef4444);
+}
+
+/* Optimized Flow - AI-controlled, always fast green with glow */
+path.traffic-flow-anim.flow-optimized {
+  stroke: #10b981 !important;
+  animation-duration: 0.3s !important;
+  filter: drop-shadow(0 0 6px #10b981);
+  stroke-width: 6px !important;
 }
 
 /* Glow effect for active routes */

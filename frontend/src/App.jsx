@@ -581,17 +581,18 @@ const App = () => {
 
                 // Determine flow animation class based on congestion
                 const isPeakHour = (simulationTime >= 8 && simulationTime <= 11) || (simulationTime >= 17 && simulationTime <= 20);
+                const isCongested = link.congestion > 70 || (isPeakHour && !optimized);
                 let flowClass = '';
 
                 if (isPathSegment || isSelected) {
                   if (optimized) {
-                    flowClass = 'traffic-flow-optimized';
-                  } else if (link.congestion > 60) {
-                    flowClass = 'traffic-flow-slow';
+                    flowClass = 'traffic-flow-anim flow-optimized';
+                  } else if (isCongested || link.congestion > 60) {
+                    flowClass = 'traffic-flow-anim flow-slow';
                   } else if (link.congestion > 30) {
-                    flowClass = 'traffic-flow-medium';
+                    flowClass = 'traffic-flow-anim flow-medium';
                   } else {
-                    flowClass = 'traffic-flow-fast';
+                    flowClass = 'traffic-flow-anim flow-fast';
                   }
                 }
 
