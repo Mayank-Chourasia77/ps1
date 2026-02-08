@@ -9,7 +9,8 @@
 
   color-scheme: dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #0f172a; /* Slate 900 */
+  background-color: #0f172a;
+  /* Slate 900 */
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -23,7 +24,8 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
-  overflow: hidden; /* Prevent scrollbars if graph is full screen */
+  overflow: hidden;
+  /* Prevent scrollbars if graph is full screen */
 }
 
 #root {
@@ -34,7 +36,8 @@ body {
 
 /* Glassmorphism Utility */
 .glass-panel {
-  background: rgba(30, 41, 59, 0.7); /* Slate 800 with opacity */
+  background: rgba(30, 41, 59, 0.7);
+  /* Slate 800 with opacity */
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-right: 1px solid rgba(255, 255, 255, 0.1);
@@ -123,11 +126,11 @@ body {
   border-radius: 50%;
 }
 
-input:checked + .slider {
+input:checked+.slider {
   background-color: #10b981;
 }
 
-input:checked + .slider:before {
+input:checked+.slider:before {
   transform: translateX(22px);
 }
 
@@ -154,4 +157,42 @@ input:checked + .slider:before {
   font-size: 0.875rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
+}
+
+/* ===== TRAFFIC FLOW ANIMATION (Packet Tracer Effect) ===== */
+@keyframes flowAnimation {
+  to {
+    stroke-dashoffset: -30;
+  }
+}
+
+/* Fast flow - Green roads, free traffic */
+.traffic-flow-fast path {
+  stroke-dasharray: 10, 20 !important;
+  animation: flowAnimation 0.4s linear infinite !important;
+}
+
+/* Medium flow - Orange roads, moderate traffic */
+.traffic-flow-medium path {
+  stroke-dasharray: 8, 15 !important;
+  animation: flowAnimation 1.0s linear infinite !important;
+}
+
+/* Slow flow - Red roads, jammed traffic */
+.traffic-flow-slow path {
+  stroke-dasharray: 5, 10 !important;
+  animation: flowAnimation 2.5s linear infinite !important;
+  opacity: 0.85;
+}
+
+/* Optimized flow - Always fast and green */
+.traffic-flow-optimized path {
+  stroke-dasharray: 12, 18 !important;
+  animation: flowAnimation 0.3s linear infinite !important;
+  filter: drop-shadow(0 0 4px #10b981);
+}
+
+/* Glow effect for active routes */
+.route-glow path {
+  filter: drop-shadow(0 0 6px currentColor);
 }

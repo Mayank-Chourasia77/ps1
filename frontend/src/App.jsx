@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { MapContainer, TileLayer, Polyline, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import AntPath from './AntPath';
 
 const formatNumber = (val) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
@@ -527,31 +526,20 @@ const App = () => {
                   opacity = 0.8;
                 }
 
-                // Calculate animation delay based on congestion (lower delay = faster flow)
-                const delay = link.congestion > 60 ? 2000 : (link.congestion > 30 ? 1000 : 400);
+                // Determine flow animation class based on congestion
+                const isPeakHour = (simulationTime >= 8 && simulationTime <= 11) || (simulationTime >= 17 && simulationTime <= 20);
+                let flowClass = '';
 
-                // Use AntPath for path segments (animated), Polyline for non-path
-                if (isPathSegment) {
-                  return (
-                    <AntPath
-                      key={idx}
-                      positions={[startCoord, endCoord]}
-                      options={{
-                        color: color,
-                        pulseColor: '#ffffff',
-                        weight: weight,
-                        opacity: opacity,
-                        delay: optimized ? 300 : delay,
-                        dashArray: [10, 20]
-                      }}
-                      eventHandlers={{
-                        click: () => {
-                          setSelectedSource(link.source.id || link.source);
-                          setSelectedTarget(link.target.id || link.target);
-                        }
-                      }}
-                    />
-                  );
+                if (isPathSegment || isSelected) {
+                  if (optimized) {
+                    flowClass = 'traffic-flow-optimized';
+                  } else if (link.congestion > 60) {
+                    flowClass = 'traffic-flow-slow';
+                  } else if (link.congestion > 30) {
+                    flowClass = 'traffic-flow-medium';
+                  } else {
+                    flowClass = 'traffic-flow-fast';
+                  }
                 }
 
                 return (
@@ -559,6 +547,7 @@ const App = () => {
                     key={idx}
                     positions={[startCoord, endCoord]}
                     pathOptions={{ color, weight, opacity }}
+                    className={flowClass}
                     eventHandlers={{
                       click: () => {
                         setSelectedSource(link.source.id || link.source);
@@ -572,6 +561,7 @@ const App = () => {
                         <p>CONGESTION: <span className={link.congestion > 60 ? 'text-accent-danger' : 'text-accent-success'}>
                           {link.congestion.toFixed(1)}%
                         </span></p>
+                        {isPeakHour && <p className="text-accent-warning text-[8px] mt-1">⚠ PEAK HOUR</p>}
                       </div>
                     </Tooltip>
                   </Polyline>
