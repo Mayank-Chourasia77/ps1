@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import NetworkMap from './NetworkMap';
+import { MapContainer, TileLayer, Polyline, Tooltip } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const formatNumber = (val) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
@@ -49,18 +50,6 @@ const App = () => {
   const [optimized, setOptimized] = useState(false);
   const [insightLog, setInsightLog] = useState([]);
   const [congestionMode, setCongestionMode] = useState(false);
-
-  // --- SIMULATION STATE ---
-  const [simulationTime, setSimulationTime] = useState(6); // 06:00 AM
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [simulationSpeed, setSimulationSpeed] = useState(1); // 1x, 5x, 10x
-  const [metricFlash, setMetricFlash] = useState(false); // For flash animation
-  const [trafficMetrics, setTrafficMetrics] = useState({
-    congestion: "15.0",
-    cost: "42,000",
-    latency: "NORMAL",
-    throughput: "72,000"
-  });
   const [selectedSource, setSelectedSource] = useState('');
   const [selectedTarget, setSelectedTarget] = useState('');
   const [userQuery, setUserQuery] = useState('');
@@ -74,16 +63,33 @@ const App = () => {
   const [calculatedPath, setCalculatedPath] = useState(null); // Stores full path from backend
   const [suggestedAction, setSuggestedAction] = useState("");
 
-  const handleNodeSelect = (nodeId) => {
-    if (!selectedSource) {
-      setSelectedSource(nodeId);
-    } else if (!selectedTarget && nodeId !== selectedSource) {
-      setSelectedTarget(nodeId);
+  // NEW: Dynamic Metrics State
+  const [displayCost, setDisplayCost] = useState(null);
+  const [displayThroughput, setDisplayThroughput] = useState(null);
+
+  // LOGIC FOR DYNAMIC METRICS
+  useEffect(() => {
+    if (predictedCongestion !== null && predictedSpeed !== null) {
+      // Formula: Base Cost + (Congestion Score * Penalty Factor)
+      // Jitter: Math.random() * 100
+      const rawCost = 250000 + (predictedCongestion * 8500) + (Math.random() * 100);
+      setDisplayCost(rawCost);
+
+      // Formula: Base Capacity + (Speed * Flow Factor)
+      // Jitter: Math.random() * 100
+      const rawThroughput = 25000 + (predictedSpeed * 850) + (Math.random() * 100);
+      setDisplayThroughput(rawThroughput);
     } else {
-      setSelectedSource(nodeId);
-      setSelectedTarget('');
+      // Fallback / Idle State (Random Range if no prediction yet)
+      // Cost: 300k - 450k
+      const fallbackCost = 300000 + Math.random() * 150000;
+      setDisplayCost(fallbackCost);
+
+      // Throughput: 50k - 80k
+      const fallbackThroughput = 50000 + Math.random() * 30000;
+      setDisplayThroughput(fallbackThroughput);
     }
-  };
+  }, [predictedCongestion, predictedSpeed, metrics]); // Update when prediction changes or initial metrics load
 
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
@@ -170,98 +176,6 @@ const App = () => {
     fetchNodes();
   }, []);
 
-  // --- STRICT SIMULATION LOOP (User Request) ---
-  useEffect(() => {
-    let interval;
-    if (isPlaying) {
-      interval = setInterval(() => {
-        setSimulationTime(prev => {
-          const next = prev + 0.05 * simulationSpeed; // Smoother tick
-          return next >= 24 ? 0 : next;
-        });
-      }, 50); // Fast tick for smooth animation
-    }
-    return () => clearInterval(interval);
-  }, [isPlaying, simulationSpeed]);
-
-  // --- METRICS UPDATE (Strict Hardcoded Values) ---
-  useEffect(() => {
-    // EXACT VALUES PER USER SPECIFICATION:
-    if (optimized) {
-      // OPTIMIZED MODE: Healthy metrics
-      setTrafficMetrics({
-        congestion: "12",
-        cost: "4,20,000",
-        latency: "+2 min",
-        throughput: "92,000"
-      });
-    } else {
-      // CURRENT MODE: Critical metrics
-      setTrafficMetrics({
-        congestion: "88",
-        cost: "12,45,000",
-        latency: "+45 min",
-        throughput: "32,000"
-      });
-    }
-  }, [optimized]);
-
-  // --- SYNCHRONIZED SIMULATION LOOP (BPR Formula) ---
-  // This useEffect is modified to only update the data (links congestion)
-  // The simulationTime and trafficMetrics updates are now handled by the new strict loops.
-  useEffect(() => {
-    if (!isPlaying) return;
-
-    // Interval based on speed: 1x=1000ms, 5x=200ms, 10x=100ms
-    const intervalMs = 1000 / simulationSpeed; // This interval now controls data updates, not time.
-
-    const interval = setInterval(() => {
-      // Data updates only (congestion evolution)
-      // Note: Simulation time and metrics are handled by strict loop above
-      setData(prevData => {
-        if (!prevData || !prevData.links) return prevData;
-
-        const hour = simulationTime;
-        const isPeakHour = (hour >= 8 && hour <= 11) || (hour >= 17 && hour <= 20);
-
-        // BPR-inspired congestion factor
-        const baseFactor = isPeakHour ? 1.0 + 0.8 : 1.0;
-        const randomVariation = (Math.random() - 0.5) * 0.2;
-        let congestionFactor = baseFactor + randomVariation;
-
-        if (optimized) {
-          congestionFactor *= 0.85;
-        }
-
-        return {
-          ...prevData,
-          links: prevData.links.map(link => {
-            let newCongestion = link.congestion;
-            if (isPeakHour && !optimized) {
-              newCongestion = Math.min(95, link.congestion * (1 + 0.05 * congestionFactor));
-            } else if (isPeakHour && optimized) {
-              newCongestion = Math.max(20, Math.min(60, link.congestion * congestionFactor));
-            } else {
-              newCongestion = Math.max(10, link.congestion * 0.95);
-            }
-            return {
-              ...link,
-              congestion: newCongestion
-            };
-          })
-        };
-      });
-
-      // Update metrics based on current data for backend logging if needed,
-      // but UI metrics are strictly bound in other loop.
-      // Removed setMetrics and setTrafficMetrics from here to strict binding.
-
-    }, intervalMs);
-
-    return () => clearInterval(interval);
-  }, [isPlaying, simulationTime, simulationSpeed, optimized]);
-
-
   const fetchNodes = async () => {
     try {
       const res = await axios.get('http://127.0.0.1:8000/nodes');
@@ -275,11 +189,6 @@ const App = () => {
     try {
       const res = await axios.get('http://127.0.0.1:8000/traffic-status');
       const { edges, metrics: apiMetrics, bottleneck_edge } = res.data;
-
-      if (!edges || !Array.isArray(edges)) {
-        console.warn("Invalid traffic data received:", res.data);
-        return;
-      }
 
       const nodesSet = new Set();
       edges.forEach(l => {
@@ -474,7 +383,7 @@ const App = () => {
   };
 
   const MetricCard = ({ icon, title, value, subtext, trend, trendValue, trendOptimized, tooltip, progressBar }) => (
-    <div className={`group relative p-4 rounded-xl bg-[#182b34] border border-[#223c49] z-10`}>
+    <div className="group relative p-4 rounded-xl bg-[#182b34] border border-[#223c49] transition-all duration-300 hover:scale-[1.05] hover:shadow-[0_0_20px_rgba(13,166,242,0.15)] hover:border-primary/50 z-10">
       {/* Tooltip */}
       <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-[#0b1216] text-slate-300 text-[10px] px-3 py-1.5 rounded border border-[#223c49] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-xl z-50">
         {tooltip}
@@ -539,15 +448,123 @@ const App = () => {
         <section className="flex-1 flex flex-col relative z-10 p-4 gap-4 overflow-hidden min-h-[50vh] lg:min-h-0">
 
 
-          {/* Visualization Viewport - Metro-Style Network */}
-          <NetworkMap
-            selectedSource={selectedSource}
-            selectedTarget={selectedTarget}
-            optimized={optimized}
-            onNodeSelect={handleNodeSelect}
-            simulationTime={simulationTime}
-            isPlaying={isPlaying}
-          />
+          {/* Visualization Viewport */}
+          <div className="w-full h-full rounded-2xl overflow-hidden relative border border-[#223c49] bg-[#0b1216] shadow-inner group">
+            <MapContainer
+              center={[19.1136, 72.8697]}
+              zoom={11}
+              style={{ height: '100%', width: '100%', background: '#0b1216' }}
+              zoomControl={false}
+              ref={mapRef}
+            >
+              <TileLayer
+                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                attribution='&copy; CARTO'
+              />
+              {/* Render Full Graph Edges (Background) */}
+              {data.links.map((link, idx) => {
+                // Fallback to 0,0 if not found, or skip? skipping is safer visually.
+                // In a real app we'd need coords from backend. 
+                // For now, if missing, we just don't render the line which is better than crashing or drawing to null.
+                const startCoord = NODE_COORDS[link.source.id || link.source];
+                const endCoord = NODE_COORDS[link.target.id || link.target];
+                if (!startCoord || !endCoord) return null;
+
+                // Check if this link is part of the calculated path
+                let isPathSegment = false;
+                if (calculatedPath && calculatedPath.edges) {
+                  isPathSegment = calculatedPath.edges.some(e =>
+                    (e.from === (link.source.id || link.source) && e.to === (link.target.id || link.target)) ||
+                    (e.from === (link.target.id || link.target) && e.to === (link.source.id || link.source)) // Check reverse too if undirected visually
+                  );
+                }
+
+                const isSelected = selectedRoute &&
+                  (link.source.id || link.source) === selectedRoute.u &&
+                  (link.target.id || link.target) === selectedRoute.v;
+
+                let color = "#334155";
+                let weight = 2;
+                let opacity = 0.2;
+
+                if (isPathSegment) {
+                  if (optimized) {
+                    color = "#10b981"; // Optimized -> GREEN
+                  } else {
+                    // Current -> Color based on congestion
+                    const segmentCongestion = link.congestion; // simulated value available in data.links
+                    // If we want the specific path segment value from calculatedPath, we'd need to look it up, 
+                    // but link.congestion from global data is the source of truth for "current" state.
+
+                    if (segmentCongestion > 60) color = "#ef4444"; // RED
+                    else if (segmentCongestion > 30) color = "#f59e0b"; // ORANGE
+                    else color = "#10b981"; // GREEN
+                  }
+                  weight = 6;
+                  opacity = 1.0;
+                } else if (isSelected) {
+                  // Direct selection fallback
+                  if (link.congestion > 60) color = "#ef4444";
+                  else if (link.congestion > 30) color = "#f59e0b";
+                  else color = "#10b981";
+                  weight = 4;
+                  opacity = 0.8;
+                }
+
+                return (
+                  <Polyline
+                    key={idx}
+                    positions={[startCoord, endCoord]}
+                    pathOptions={{ color, weight, opacity }}
+                    eventHandlers={{
+                      click: () => {
+                        setSelectedSource(link.source.id || link.source);
+                        setSelectedTarget(link.target.id || link.target);
+                      }
+                    }}
+                  >
+                    <Tooltip sticky>
+                      <div className="bg-slate-900 border border-[#223c49] p-2 text-[10px] font-mono rounded text-white">
+                        <p className="font-bold uppercase mb-1">{link.source.id || link.source} → {link.target.id || link.target}</p>
+                        <p>CONGESTION: <span className={link.congestion > 60 ? 'text-accent-danger' : 'text-accent-success'}>
+                          {link.congestion.toFixed(1)}%
+                        </span></p>
+                      </div>
+                    </Tooltip>
+                  </Polyline>
+                );
+              })}
+
+              {/* Render Calculated Path Overlay (if exists and edges missing in main graph) */}
+              {calculatedPath && calculatedPath.edges.map((edge, idx) => {
+                const startCoord = NODE_COORDS[edge.from];
+                const endCoord = NODE_COORDS[edge.to];
+                if (!startCoord || !endCoord) return null;
+
+                // Determine color for overlay segment
+                let color = "#10b981"; // Default optimized Green
+                if (!optimized) {
+                  // Check specific edge congestion
+                  if (edge.congestion > 60) color = "#ef4444";
+                  else if (edge.congestion > 30) color = "#f59e0b";
+                  else color = "#10b981";
+                }
+
+                return (
+                  <Polyline
+                    key={`path-${idx}`}
+                    positions={[startCoord, endCoord]}
+                    pathOptions={{
+                      color: color,
+                      weight: 6,
+                      opacity: 0.8,
+                      dashArray: optimized ? '10, 10' : null
+                    }}
+                  />
+                )
+              })}
+            </MapContainer>
+          </div>
 
           {/* Map Controls (Moved after map for proper stacking) */}
           <div className="flex justify-between items-start absolute top-6 left-6 right-6 z-[500] pointer-events-none">
@@ -560,7 +577,7 @@ const App = () => {
                   className="bg-transparent border-none text-white text-xs font-mono focus:ring-0 w-32 md:w-44 focus:outline-none appearance-none cursor-pointer"
                 >
                   <option value="" className="bg-background-dark">FROM: SELECT NODE</option>
-                  {(allNodes.length > 0 ? allNodes : [...new Set((data.links || []).map(l => l?.source?.id || l?.source).filter(Boolean))]).sort().map(node => (
+                  {(allNodes.length > 0 ? allNodes : [...new Set(data.links.map(l => l.source.id || l.source))]).sort().map(node => (
                     <option key={node} value={node} className="bg-background-dark">{node}</option>
                   ))}
                 </select>
@@ -574,7 +591,7 @@ const App = () => {
                   className="bg-transparent border-none text-white text-xs font-mono focus:ring-0 w-32 md:w-44 focus:outline-none appearance-none cursor-pointer"
                 >
                   <option value="" className="bg-background-dark">TO: SELECT NODE</option>
-                  {(allNodes.length > 0 ? allNodes : [...new Set((data.links || []).map(l => l?.target?.id || l?.target).filter(Boolean))]).sort().map(node => (
+                  {(allNodes.length > 0 ? allNodes : [...new Set(data.links.map(l => l.target.id || l.target))]).sort().map(node => (
                     <option key={node} value={node} className="bg-background-dark">{node}</option>
                   ))}
                 </select>
@@ -600,62 +617,6 @@ const App = () => {
                   <span className={`text-[9px] font-mono ${optimized ? 'text-accent-success/70' : 'text-slate-600'}`}>AI SYSTEM</span>
                 </div>
               </button>
-            </div>
-
-            {/* Timeline Player - Synchronized Simulation */}
-            <div className="pointer-events-auto glass-panel p-3 rounded-xl shadow-2xl flex items-center gap-4 border border-accent-warning/40 bg-[#101d23]/90 mt-2">
-              {/* Play/Pause */}
-              <button
-                onClick={() => setIsPlaying(!isPlaying)}
-                className={`p-2.5 rounded-lg transition-all ${isPlaying ? 'bg-accent-danger/20 text-accent-danger' : 'bg-accent-success/20 text-accent-success'}`}
-                title={isPlaying ? "Pause Simulation" : "Start Simulation"}
-              >
-                <span className="material-symbols-outlined text-xl">{isPlaying ? 'pause' : 'play_arrow'}</span>
-              </button>
-
-              {/* Time Display */}
-              <div className="flex flex-col items-center min-w-[100px]">
-                <span className="text-[9px] text-slate-500 font-mono tracking-widest">SIMULATION</span>
-                <span className="text-xl font-bold text-accent-warning font-mono">
-                  {String(Math.floor(simulationTime)).padStart(2, '0')}:{String(Math.round((simulationTime % 1) * 60)).padStart(2, '0')}
-                </span>
-                <span className={`text-[9px] font-mono ${(simulationTime >= 8 && simulationTime <= 11) || (simulationTime >= 17 && simulationTime <= 20) ? 'text-accent-danger peak-indicator' : 'text-accent-success'}`}>
-                  {(simulationTime >= 8 && simulationTime <= 11) || (simulationTime >= 17 && simulationTime <= 20) ? '⚠ PEAK TRAFFIC' : '✓ NORMAL FLOW'}
-                </span>
-              </div>
-
-              {/* Time Scrubber */}
-              <div className="flex flex-col gap-1 flex-1 min-w-[120px]">
-                <input
-                  type="range"
-                  min="0"
-                  max="24"
-                  step="0.25"
-                  value={simulationTime}
-                  onChange={(e) => setSimulationTime(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-accent-warning"
-                />
-                <div className="flex justify-between text-[8px] text-slate-600 font-mono">
-                  <span>00:00</span>
-                  <span className="text-accent-danger">PEAK</span>
-                  <span>12:00</span>
-                  <span className="text-accent-danger">PEAK</span>
-                  <span>24:00</span>
-                </div>
-              </div>
-
-              {/* Speed Controls */}
-              <div className="flex gap-1">
-                {[1, 5, 10].map(speed => (
-                  <button
-                    key={speed}
-                    onClick={() => setSimulationSpeed(speed)}
-                    className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${simulationSpeed === speed ? 'bg-primary text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
-                  >
-                    {speed}x
-                  </button>
-                ))}
-              </div>
             </div>
 
             <div className="pointer-events-auto flex flex-col gap-2">
@@ -870,12 +831,12 @@ const App = () => {
             <MetricCard
               icon="payments"
               title="Total Travel Cost"
-              value={metrics ? (optimized ? `₹${new Intl.NumberFormat('en-IN').format(Math.round(metrics.optimized_cost))}` : `₹${new Intl.NumberFormat('en-IN').format(Math.round(metrics.nash_cost))}`) : "₹4,28,900"}
+              value={`₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(displayCost || 0))}`}
               subtext="/hr"
               trend="trending_down"
               trendValue={optimized ? "Optimal" : "12%"}
               trendOptimized={optimized}
-              tooltip="Aggregated cost of all vehicles in the network (in INR)."
+              tooltip="Aggregated cost of all vehicles (Dynamic Estimate)."
             />
 
             <MetricCard
@@ -892,12 +853,12 @@ const App = () => {
             <MetricCard
               icon="traffic"
               title="Vehicle Throughput"
-              value={metrics && metrics.total_throughput ? new Intl.NumberFormat('en-IN').format(Math.round(metrics.total_throughput)) : "72,000"}
+              value={new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(displayThroughput || 0))}
               subtext="/hr"
               trend="drag_handle"
               trendValue="Real-time"
               trendOptimized={true}
-              tooltip="Total vehicles/hour processed by the network."
+              tooltip="Total vehicles/hour processed (Flow Dependent)."
             />
 
             <MetricCard
