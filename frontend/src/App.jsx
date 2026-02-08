@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { MapContainer, TileLayer, Polyline, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import AnimatedPolyline from './AnimatedPolyline';
 
 const formatNumber = (val) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
@@ -597,19 +598,18 @@ const App = () => {
                 }
 
                 return (
-                  <Polyline
+                  <AnimatedPolyline
                     key={idx}
                     positions={[startCoord, endCoord]}
                     pathOptions={{ color, weight, opacity }}
-                    className={flowClass}
+                    flowClass={flowClass}
                     eventHandlers={{
                       click: () => {
                         setSelectedSource(link.source.id || link.source);
                         setSelectedTarget(link.target.id || link.target);
                       }
                     }}
-                  >
-                    <Tooltip sticky>
+                    tooltipContent={
                       <div className="bg-slate-900 border border-[#223c49] p-2 text-[10px] font-mono rounded text-white">
                         <p className="font-bold uppercase mb-1">{link.source.id || link.source} → {link.target.id || link.target}</p>
                         <p>CONGESTION: <span className={link.congestion > 60 ? 'text-accent-danger' : 'text-accent-success'}>
@@ -617,8 +617,8 @@ const App = () => {
                         </span></p>
                         {isPeakHour && <p className="text-accent-warning text-[8px] mt-1">⚠ PEAK HOUR</p>}
                       </div>
-                    </Tooltip>
-                  </Polyline>
+                    }
+                  />
                 );
               })}
 
