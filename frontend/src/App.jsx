@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { MapContainer, TileLayer, Polyline, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import NetworkGraph from './NetworkGraph';
+import { calculateLiveMetrics, SIMULATION_TIMELINE } from './SimulationEngine';
 
 const formatNumber = (val) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
@@ -71,6 +73,9 @@ const App = () => {
   const [simulationMode, setSimulationMode] = useState(false);
   const [simStep, setSimStep] = useState(0); // 0: Normal, 1: Accident, 2: Fixing
   const simInterval = useRef(null);
+
+  // --- VIEW MODE STATE (Map vs Schematic) ---
+  const [viewMode, setViewMode] = useState('schematic'); // 'map' or 'schematic'
 
   const runDisasterSimulation = () => {
     if (simulationMode) return; // Prevention
@@ -520,122 +525,166 @@ const App = () => {
           )}
 
 
+
           {/* Visualization Viewport */}
           <div className="w-full h-full rounded-2xl overflow-hidden relative border border-[#223c49] bg-[#0b1216] shadow-inner group">
-            <MapContainer
-              center={[19.1136, 72.8697]}
-              zoom={11}
-              style={{ height: '100%', width: '100%', background: '#0b1216' }}
-              zoomControl={false}
-              ref={mapRef}
-            >
-              <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                attribution='&copy; CARTO'
-              />
-              {/* Render Full Graph Edges (Background) */}
-              {data.links.map((link, idx) => {
-                // Fallback to 0,0 if not found, or skip? skipping is safer visually.
-                // In a real app we'd need coords from backend. 
-                // For now, if missing, we just don't render the line which is better than crashing or drawing to null.
-                const startCoord = NODE_COORDS[link.source.id || link.source];
-                const endCoord = NODE_COORDS[link.target.id || link.target];
-                if (!startCoord || !endCoord) return null;
 
-                // Check if this link is part of the calculated path
-                let isPathSegment = false;
-                if (calculatedPath && calculatedPath.edges) {
-                  isPathSegment = calculatedPath.edges.some(e =>
-                    (e.from === (link.source.id || link.source) && e.to === (link.target.id || link.target)) ||
-                    (e.from === (link.target.id || link.target) && e.to === (link.source.id || link.source)) // Check reverse too if undirected visually
-                  );
-                }
+            {/* View Mode Toggle */}
+            <div className="absolute top-4 right-4 z-50 flex gap-1 bg-[#0b1216]/90 backdrop-blur-md p-1 rounded-lg border border-cyan-900/30">
+              <button
+                onClick={() => setViewMode('schematic')}
+                className={`px-3 py-1.5 text-xs font-bold rounded transition-all ${viewMode === 'schematic' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                <span className="material-symbols-outlined text-sm mr-1 align-middle">account_tree</span>
+                SCHEMATIC
+              </button>
+              <button
+                onClick={() => setViewMode('map')}
+                className={`px-3 py-1.5 text-xs font-bold rounded transition-all ${viewMode === 'map' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                <span className="material-symbols-outlined text-sm mr-1 align-middle">map</span>
+                MAP
+              </button>
+            </div>
 
-                const isSelected = selectedRoute &&
-                  (link.source.id || link.source) === selectedRoute.u &&
-                  (link.target.id || link.target) === selectedRoute.v;
-
-                let color = "#334155";
-                let weight = 2;
-                let opacity = 0.2;
-
-                if (isPathSegment) {
-                  if (optimized) {
-                    color = "#10b981"; // Optimized -> GREEN
-                  } else {
-                    // Current -> Color based on congestion
-                    const segmentCongestion = link.congestion; // simulated value available in data.links
-                    // If we want the specific path segment value from calculatedPath, we'd need to look it up, 
-                    // but link.congestion from global data is the source of truth for "current" state.
-
-                    if (segmentCongestion > 60) color = "#ef4444"; // RED
-                    else if (segmentCongestion > 30) color = "#f59e0b"; // ORANGE
-                    else color = "#10b981"; // GREEN
+            {/* Schematic View (NetworkGraph) */}
+            {viewMode === 'schematic' && (
+              <NetworkGraph
+                edges={data.links.map(l => ({
+                  from: l.source.id || l.source,
+                  to: l.target.id || l.target,
+                  congestion: (l.congestion || 0) / 100 // Normalize to 0-1
+                }))}
+                isOptimized={optimized}
+                selectedPath={calculatedPath}
+                simulationStep={simStep}
+                onNodeClick={(nodeName) => {
+                  if (!selectedSource) {
+                    setSelectedSource(nodeName);
+                  } else if (!selectedTarget) {
+                    setSelectedTarget(nodeName);
                   }
-                  weight = 6;
-                  opacity = 1.0;
-                } else if (isSelected) {
-                  // Direct selection fallback
-                  if (link.congestion > 60) color = "#ef4444";
-                  else if (link.congestion > 30) color = "#f59e0b";
-                  else color = "#10b981";
-                  weight = 4;
-                  opacity = 0.8;
-                }
+                }}
+              />
+            )}
 
-                return (
-                  <Polyline
-                    key={idx}
-                    positions={[startCoord, endCoord]}
-                    pathOptions={{ color, weight, opacity }}
-                    eventHandlers={{
-                      click: () => {
-                        setSelectedSource(link.source.id || link.source);
-                        setSelectedTarget(link.target.id || link.target);
-                      }
-                    }}
-                  >
-                    <Tooltip sticky>
-                      <div className="bg-slate-900 border border-[#223c49] p-2 text-[10px] font-mono rounded text-white">
-                        <p className="font-bold uppercase mb-1">{link.source.id || link.source} → {link.target.id || link.target}</p>
-                        <p>CONGESTION: <span className={link.congestion > 60 ? 'text-accent-danger' : 'text-accent-success'}>
-                          {link.congestion.toFixed(1)}%
-                        </span></p>
-                      </div>
-                    </Tooltip>
-                  </Polyline>
-                );
-              })}
+            {/* Map View (Leaflet) */}
+            {viewMode === 'map' && (
+              <MapContainer
+                center={[19.1136, 72.8697]}
+                zoom={11}
+                style={{ height: '100%', width: '100%', background: '#0b1216' }}
+                zoomControl={false}
+                ref={mapRef}
+              >
+                <TileLayer
+                  url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                  attribution='&copy; CARTO'
+                />
+                {/* Render Full Graph Edges (Background) */}
+                {data.links.map((link, idx) => {
+                  // Fallback to 0,0 if not found, or skip? skipping is safer visually.
+                  // In a real app we'd need coords from backend. 
+                  // For now, if missing, we just don't render the line which is better than crashing or drawing to null.
+                  const startCoord = NODE_COORDS[link.source.id || link.source];
+                  const endCoord = NODE_COORDS[link.target.id || link.target];
+                  if (!startCoord || !endCoord) return null;
 
-              {/* Render Calculated Path Overlay (if exists and edges missing in main graph) */}
-              {calculatedPath && calculatedPath.edges.map((edge, idx) => {
-                const startCoord = NODE_COORDS[edge.from];
-                const endCoord = NODE_COORDS[edge.to];
-                if (!startCoord || !endCoord) return null;
+                  // Check if this link is part of the calculated path
+                  let isPathSegment = false;
+                  if (calculatedPath && calculatedPath.edges) {
+                    isPathSegment = calculatedPath.edges.some(e =>
+                      (e.from === (link.source.id || link.source) && e.to === (link.target.id || link.target)) ||
+                      (e.from === (link.target.id || link.target) && e.to === (link.source.id || link.source)) // Check reverse too if undirected visually
+                    );
+                  }
 
-                // Determine color for overlay segment
-                let color = "#10b981"; // Default optimized Green
-                if (!optimized) {
-                  // Check specific edge congestion
-                  if (edge.congestion > 60) color = "#ef4444";
-                  else if (edge.congestion > 30) color = "#f59e0b";
-                  else color = "#10b981";
-                }
+                  const isSelected = selectedRoute &&
+                    (link.source.id || link.source) === selectedRoute.u &&
+                    (link.target.id || link.target) === selectedRoute.v;
 
-                return (
-                  <Polyline
-                    key={`path-${idx}`}
-                    positions={[startCoord, endCoord]}
-                    pathOptions={{
-                      color: color,
-                      weight: 6,
-                      opacity: 0.8,
-                      dashArray: optimized ? '10, 10' : null
-                    }}
-                  />
-                )
-              })}
-            </MapContainer>
+                  let color = "#334155";
+                  let weight = 2;
+                  let opacity = 0.2;
+
+                  if (isPathSegment) {
+                    if (optimized) {
+                      color = "#10b981"; // Optimized -> GREEN
+                    } else {
+                      // Current -> Color based on congestion
+                      const segmentCongestion = link.congestion; // simulated value available in data.links
+                      // If we want the specific path segment value from calculatedPath, we'd need to look it up, 
+                      // but link.congestion from global data is the source of truth for "current" state.
+
+                      if (segmentCongestion > 60) color = "#ef4444"; // RED
+                      else if (segmentCongestion > 30) color = "#f59e0b"; // ORANGE
+                      else color = "#10b981"; // GREEN
+                    }
+                    weight = 6;
+                    opacity = 1.0;
+                  } else if (isSelected) {
+                    // Direct selection fallback
+                    if (link.congestion > 60) color = "#ef4444";
+                    else if (link.congestion > 30) color = "#f59e0b";
+                    else color = "#10b981";
+                    weight = 4;
+                    opacity = 0.8;
+                  }
+
+                  return (
+                    <Polyline
+                      key={idx}
+                      positions={[startCoord, endCoord]}
+                      pathOptions={{ color, weight, opacity }}
+                      eventHandlers={{
+                        click: () => {
+                          setSelectedSource(link.source.id || link.source);
+                          setSelectedTarget(link.target.id || link.target);
+                        }
+                      }}
+                    >
+                      <Tooltip sticky>
+                        <div className="bg-slate-900 border border-[#223c49] p-2 text-[10px] font-mono rounded text-white">
+                          <p className="font-bold uppercase mb-1">{link.source.id || link.source} → {link.target.id || link.target}</p>
+                          <p>CONGESTION: <span className={link.congestion > 60 ? 'text-accent-danger' : 'text-accent-success'}>
+                            {link.congestion.toFixed(1)}%
+                          </span></p>
+                        </div>
+                      </Tooltip>
+                    </Polyline>
+                  );
+                })}
+
+                {/* Render Calculated Path Overlay (if exists and edges missing in main graph) */}
+                {calculatedPath && calculatedPath.edges.map((edge, idx) => {
+                  const startCoord = NODE_COORDS[edge.from];
+                  const endCoord = NODE_COORDS[edge.to];
+                  if (!startCoord || !endCoord) return null;
+
+                  // Determine color for overlay segment
+                  let color = "#10b981"; // Default optimized Green
+                  if (!optimized) {
+                    // Check specific edge congestion
+                    if (edge.congestion > 60) color = "#ef4444";
+                    else if (edge.congestion > 30) color = "#f59e0b";
+                    else color = "#10b981";
+                  }
+
+                  return (
+                    <Polyline
+                      key={`path-${idx}`}
+                      positions={[startCoord, endCoord]}
+                      pathOptions={{
+                        color: color,
+                        weight: 6,
+                        opacity: 0.8,
+                        dashArray: optimized ? '10, 10' : null
+                      }}
+                    />
+                  )
+                })}
+              </MapContainer>
+            )}
           </div>
 
           {/* Map Controls (Moved after map for proper stacking) */}
