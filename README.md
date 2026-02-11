@@ -82,7 +82,7 @@
 ## 📁 Project Structure
 
 ```
-ps1/
+Datathon_PS1/
 ├── backend/
 │   ├── main.py              # FastAPI server, all endpoints
 │   ├── ml_inference.py      # ML prediction module (Random Forest)
@@ -116,8 +116,8 @@ ps1/
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/Mayank-Chourasia77/ps1.git
-cd ps1
+git clone https://github.com/Mayank-Chourasia77/Datathon_PS1.git
+cd Datathon_PS1
 ```
 
 ### 2. Backend Setup
